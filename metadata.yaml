@@ -1,0 +1,25 @@
+# Copyright 2022 pietro
+# See LICENSE file for licensing details.
+
+# For a complete list of supported options, see:
+# https://juju.is/docs/sdk/metadata-reference
+name: traefik-route-k8s
+display-name: |
+  traefik-route-k8s
+description: |
+  Configuration charm for traefik-k8s. Flexible ingress-per-unit provider.
+summary: |
+  Configuration charm for traefik-k8s. Flexible ingress-per-unit provider.
+
+provides:
+    ingress:
+        interface: ingress_per_unit
+        limit: 1
+        optional: false
+
+requires:
+    traefik_route:
+        interface: traefik_route
+        limit: 1
+        optional: false
+
