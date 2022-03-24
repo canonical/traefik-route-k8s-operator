@@ -5,18 +5,25 @@ options:
   rule:
     default:
     description: >
-      Jinja2 template for Traefik router's `rule` field. It can contain
-      the following variables:
+      A Traefik routing rule, see https://doc.traefik.io/traefik/routing/routers/ for
+      an overview.
+
+      The value of the field is going to be processed as a Jinja2 template, with the
+      following globals available:
        - {{juju_model}} resolves to the model name of the downstream proxied 
          application.
        - {{juju_application}} resolves to the application name of the downstream 
          proxied application.
-       - {{juju_unit}} resolves to the unit name of the downstream proxied unit 
-         (this is applicable only when the ingress is performed per-unit, and in the 
-         future we plan to support also application-level routing); 
+       - {{juju_unit}} resolves to the unit name of the downstream proxied unit;
          to avoid issues when used together with the Host directive or similar, 
          the slash character between application name and unit index is replaced with a dash.
-      
-      For example:
-        rule = Host(`foo.bar/{{juju_unit}}`)
+
+      For example, given a downstream unit called `prometheus/0` in the `cos` model, the following:
+
+        Host(`foo.bar/{{juju_model}}-{{juju_unit}}`)
+
+      would evaluate to:
+
+        Host(`foo.bar/cos-prometheus-0`)
+
     type: string
