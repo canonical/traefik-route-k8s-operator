@@ -47,6 +47,7 @@ import json
 import logging
 from typing import Optional, Dict
 
+import yaml
 from ops.charm import CharmBase, RelationEvent, RelationRole, CharmEvents
 from ops.framework import EventSource, Object
 from ops.model import Relation, Unit
@@ -62,6 +63,7 @@ LIBAPI = 0
 LIBPATCH = 0
 
 log = logging.getLogger(__name__)
+
 
 def _deserialize_data(data):
     return json.loads(data)
@@ -86,15 +88,46 @@ class TraefikRouteRequestEvent(RelationEvent):
     """
 
 
-class TraefikRouteProviderEvents(CharmEvents):
-    """Container for IUP events."""
+class TraefikRouteIngressReadyEvent(RelationEvent):
+    """Event representing a ready state from the traefik charm."""
+    def __init__(self, handle, ingress, relation, app=None, unit=None):
+        super().__init__(handle, relation, app=app, unit=unit)
+        self.ingress = ingress
 
+    def snapshot(self) -> dict:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        snap = super().snapshot()
+        snap['ingress'] = self.ingress
+
+    def restore(self, snapshot: dict) -> None:
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        self.ingress = snapshot.pop('ingress')
+        super().restore(snapshot)
+
+
+class TraefikRouteProviderEvents(CharmEvents):
+    """Container for TRP events."""
     request = EventSource(TraefikRouteRequestEvent)
 
 
-class TraefikRouteProvider(Object):
-    """Implementation of the provider of traefik_route."""
+class TraefikRouteRequirerEvents(CharmEvents):
+    """Container for TRR events."""
+    ingress_ready = EventSource(TraefikRouteIngressReadyEvent)
 
+
+class TraefikRouteProvider(Object):
+    """Implementation of the provider of traefik_route.
+
+    This will presumably be owned by a Traefik charm.
+    The main idea is that traefik will observe the `request` event and, upon
+    receiving it, will
+    """
     on = TraefikRouteProviderEvents()
 
     def __init__(self, charm: CharmBase, endpoint: str = 'traefik_route'):
@@ -106,7 +139,8 @@ class TraefikRouteProvider(Object):
                 (defaults to "traefik_route").
         """
         super().__init__(charm, endpoint)
-        self.framework.observe(self.on.ready, self._emit_request_event)
+        self.framework.observe(self.on[endpoint].relation_joined,
+                               self._emit_request_event)
 
     def _emit_request_event(self, event):
         self.on.request.emit(event.relation)
@@ -123,7 +157,7 @@ class TraefikRouteRequirer(Object):
     {
         'ingress': {
             'model': 'cos',
-            'unit': 'prometheus-k8s/0',
+            'unit': 'prometheus-k8s/0'
         },
         'config': {
             'rule': 'Host(`foo.bar/{{juju_unit}}`)'
@@ -138,12 +172,32 @@ class TraefikRouteRequirer(Object):
     do its part by validating the config before this provider is invoked to
     share it with traefik.
     """
+    on = TraefikRouteRequirerEvents()
 
     def __init__(self, charm: CharmBase, endpoint: str = 'traefik_route'):
-
         super(TraefikRouteRequirer, self).__init__(charm, endpoint)
         self._charm = charm
         self._endpoint = endpoint
+
+        self.framework.observe(charm.on[endpoint].relation_changed,
+                               self._on_relation_changed)
+
+    def _on_relation_changed(self, event):
+        if ingress := self._get_ingress(event.relation):
+            log.info('ingress ready')
+            self.on.ingress_ready.emit(ingress)
+
+    def _get_ingress(self, relation: Relation):
+        data = relation.data[relation.app].get('data')
+        if not data:
+            return False
+        try:
+            app_data = yaml.safe_load(data)
+        except yaml.YAMLError as e:
+            log.error(f"error decoding {data!r} as YAML.")
+            return None
+        ingress = app_data.get(self._charm.unit.name)
+        return ingress
 
     @property
     def relation(self) -> Optional[Relation]:
@@ -157,7 +211,10 @@ class TraefikRouteRequirer(Object):
     @property
     def proxied_endpoint(self) -> Optional[str]:
         """Return the ingress url provided to this unit by the traefik charm."""
-        raw_data = self.relation.data[self.relation.app].get('traefik_route')
+        relation = self.relation
+        if not relation or not (app_data := relation.data.get(relation.app)):
+            return None
+        raw_data = app_data['traefik_route']
         data = _deserialize_data(raw_data)
         endpoint = data.get(self._charm.unit.name, {}).get('url')
         return endpoint

@@ -7,29 +7,52 @@
 """
 
 import logging
-from typing import Optional
+import typing
+from typing import Optional, Sequence
 
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, Relation, WaitingStatus
-from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider
-from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
+from ops.model import ActiveStatus, BlockedStatus, Relation, WaitingStatus, Unit
+from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, \
+    IngressRequest
+from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer, \
+    TraefikRouteIngressReadyEvent
 
 logger = logging.getLogger(__name__)
 
 
+class _HasUnits(typing.Protocol):
+    @property
+    def units(self) -> typing.Sequence[Unit]:
+        pass
+
+
+def _check_has_one_unit(obj: _HasUnits):
+    """Checks that the obj has exactly one unit."""
+    if not obj.units:
+        logger.error(f"{obj} has no units")
+        return False
+    if len(obj.units) > 1:
+        logger.error(f"{obj} has too many units")
+        return False
+    return True
+
+
 class TraefikRouteK8SCharm(CharmBase):
     """Charm the service."""
-    _ingress_endpoint = 'ingress'
+    _ingress_endpoint = 'ingress_per_unit'
     _traefik_route_endpoint = 'traefik_route'
 
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.ingress_per_unit = IngressPerUnitProvider(self,
-                                                       self._ingress_endpoint)
-        self.traefik_route = TraefikRouteRequirer(self,
-                                                  self._traefik_route_endpoint)
+        self.ingress_per_unit = IngressPerUnitProvider(
+            self, self._ingress_endpoint)
+        self.traefik_route = TraefikRouteRequirer(
+            self, self._traefik_route_endpoint)
+
+        # if the remote app (traefik) has published the url: we give it
+        # forward to the charm who's requesting ingress.
         if url := self.traefik_route.proxied_endpoint:
             self.ingress_per_unit.get_request(self._ipu_relation).respond(
                 self.unit, url)
@@ -37,10 +60,49 @@ class TraefikRouteK8SCharm(CharmBase):
         observe = self.framework.observe
         observe(self.on.config_changed, self._on_config_changed)
         observe(self.ingress_per_unit.on.request, self._on_ingress_request)
+        observe(self.traefik_route.on.ingress_ready, self._on_ingress_ready)
+
+    def _get_relation(self, endpoint: str) -> Optional[Relation]:
+        """Fetches the Relation for endpoint and checks that there's only 1."""
+        relations = self.model.relations.get(endpoint)
+        if not relations:
+            logger.info(f"no relations yet for {endpoint}")
+            return None
+        if len(relations) > 1:
+            logger.warning(f"more than one relation for {endpoint}")
+        return relations[0]
 
     @property
     def _ipu_relation(self) -> Optional[Relation]:
-        return self.model.relations.get(self._ingress_endpoint, None)
+        return self._get_relation(self._ingress_endpoint)
+
+    @property
+    def _remote_traefik_unit(self) -> Optional[Unit]:
+        """The traefik unit providing ingress."""
+        if not self._traefik_route_relation:
+            return None
+        if not _check_has_one_unit(self._traefik_route_relation):
+            return None
+        return self._traefik_route_relation.units[0]
+
+    @property
+    def _traefik_route_relation(self) -> Optional[Relation]:
+        return self._get_relation(self._traefik_route_endpoint)
+
+    @property
+    def _remote_routed_unit(self) -> Optional[Unit]:
+        """The remote unit in need of ingress."""
+        if not self._ipu_relation:
+            return None
+        if not _check_has_one_unit(self._ipu_relation):
+            return None
+        return self._ipu_relation.units[0]
+
+    @property
+    def ingress_request(self) -> Optional[IngressRequest]:
+        """Get the request for ingress, if ingress_per_unit is active."""
+        if ipu := self._ipu_relation:
+            return self.ingress_per_unit.get_request(ipu)
 
     @property
     def rule(self) -> Optional[str]:
@@ -52,6 +114,7 @@ class TraefikRouteK8SCharm(CharmBase):
         error = self._check_config(**self._traefik_config)
 
         if error:
+            # we block until the user fixes the config
             self.unit.status = BlockedStatus(error)
             return
 
@@ -71,7 +134,7 @@ class TraefikRouteK8SCharm(CharmBase):
             error = (f"`rule` not configured; do `juju config {self.unit.name} "
                      f"rule=<RULE>;juju resolve {self.unit.name}`")
 
-        if rule != (stripped := rule.strip()):
+        elif rule != (stripped := rule.strip()):
             error = (f"Rule {rule!r} starts or ends with whitespace;"
                      f"it should be {stripped!r}.")
 
@@ -81,31 +144,59 @@ class TraefikRouteK8SCharm(CharmBase):
         return error
 
     def _on_ingress_request(self, event):
-        if not self._ipu_relation:
+        # validate config
+        error = self._check_config(**self._traefik_config)
+        if error:
+            logger.error(f"cannot process ingress request: {error}")
+            self.unit.status = BlockedStatus(
+                f"cannot process ingress request: {error}"
+            )
+            return event.defer()
+
+        # validate relation statuses
+        ipu_relation = self._ipu_relation
+        if not ipu_relation:
             self.unit.status = BlockedStatus(
                 f"Ingress requested, but ingress-per-unit relation is "
                 f"not available."
             )
             return event.defer()
-        elif self.ingress_per_unit.is_failed:
+        elif self.ingress_per_unit.is_failed(ipu_relation):
             self.unit.status = BlockedStatus(
                 f"Ingress requested, but ingress-per-unit relation is"
                 f"broken (failed)."
             )
             return event.defer()
-        elif not self.ingress_per_unit.is_available:
+        elif not self.ingress_per_unit.is_available(ipu_relation):
             self.unit.status = WaitingStatus(
                 f"ingress-per-unit is not available yet.")
             return event.defer()
 
         logger.info('Ingress request event received. IPU ready; Relaying...')
-        ingress_request = self.ingress_per_unit.get_request(self._ipu_relation)
+
+        # ingress_request should not be None since ipu is available.
+        ingress_request: IngressRequest = self.ingress_request
+        _check_has_one_unit(ingress_request)
+
+        # it's a 1:1 relation, we can assume there's only one unit
+        # but we do cowardly check after all
+        if not (no_units := len(ingress_request.units)) == 0:
+            logger.warning(f"Illegal number of units requesting ingress: {no_units}")
+
+        ingress = ingress_request._data[ingress_request.units[0]]
         self.traefik_route.relay_ingress_request(
-            ingress=dict(model=ingress_request.model,
-                         unit=ingress_request.units[0]  # it's a 1:1 relation.
-                         ),
+            ingress={'data': ingress},
             config=self._traefik_config
         )
+
+    def _on_ingress_ready(self, event: TraefikRouteIngressReadyEvent):
+        """Traefik has published ingress data via `traefik_route`.
+
+        We are going to publish it forward to the charm requesting ingress via
+        ingress_per_unit.
+        """
+        self.ingress_request.respond(self._remote_traefik_unit,
+                                     event.ingress['url'])
 
 
 if __name__ == "__main__":
