@@ -83,7 +83,7 @@ class TraefikRouteK8SCharm(CharmBase):
             return None
         if not _check_has_one_unit(self._traefik_route_relation):
             return None
-        return self._traefik_route_relation.units[0]
+        return next(iter(self._traefik_route_relation.units))
 
     @property
     def _traefik_route_relation(self) -> Optional[Relation]:
@@ -96,7 +96,7 @@ class TraefikRouteK8SCharm(CharmBase):
             return None
         if not _check_has_one_unit(self._ipu_relation):
             return None
-        return self._ipu_relation.units[0]
+        return next(iter(self._ipu_relation.units))
 
     @property
     def ingress_request(self) -> Optional[IngressRequest]:
@@ -195,8 +195,29 @@ class TraefikRouteK8SCharm(CharmBase):
         We are going to publish it forward to the charm requesting ingress via
         ingress_per_unit.
         """
-        self.ingress_request.respond(self._remote_traefik_unit,
-                                     event.ingress['url'])
+        ingress_request: IngressRequest = self.ingress_request
+        remote_unit_name = ingress_request._data[ingress_request.units[0]]['name']
+
+        remote_unit_ingress_data = event.ingress.get(remote_unit_name)
+        if not remote_unit_ingress_data:
+            logger.debug(f'ingress is ready but no ingress for '
+                         f'{remote_unit_name} has been shared yet; '
+                         f'deferring ingress_ready')
+            self.unit.status = WaitingStatus('Waiting for ingress...')
+            return event.defer()
+
+        # should we be checking that it is a dict?
+        url = remote_unit_ingress_data.get('url')
+        if not url:
+            logger.debug(f'traefik shared ingress data for {remote_unit_name}; '
+                         f'but it has an unexpected format. '
+                         f'{remote_unit_ingress_data!r}')
+            self.unit.status = BlockedStatus(
+                f"Traefik shared badly formatted data."
+            )
+            return
+
+        self.ingress_request.respond(self._remote_traefik_unit, url)
 
 
 if __name__ == "__main__":

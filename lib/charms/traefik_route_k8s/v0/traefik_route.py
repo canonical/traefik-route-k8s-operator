@@ -90,7 +90,7 @@ class TraefikRouteRequestEvent(RelationEvent):
 
 class TraefikRouteIngressReadyEvent(RelationEvent):
     """Event representing a ready state from the traefik charm."""
-    def __init__(self, handle, ingress, relation, app=None, unit=None):
+    def __init__(self, handle, relation, ingress, app=None, unit=None):
         super().__init__(handle, relation, app=app, unit=unit)
         self.ingress = ingress
 
@@ -101,6 +101,7 @@ class TraefikRouteIngressReadyEvent(RelationEvent):
         """
         snap = super().snapshot()
         snap['ingress'] = self.ingress
+        return snap
 
     def restore(self, snapshot: dict) -> None:
         """Used by the framework to deserialize the event from disk.
@@ -185,19 +186,18 @@ class TraefikRouteRequirer(Object):
     def _on_relation_changed(self, event):
         if ingress := self._get_ingress(event.relation):
             log.info('ingress ready')
-            self.on.ingress_ready.emit(ingress)
+            self.on.ingress_ready.emit(event.relation, ingress)
 
     def _get_ingress(self, relation: Relation):
         data = relation.data[relation.app].get('data')
         if not data:
             return False
         try:
-            app_data = yaml.safe_load(data)
-        except yaml.YAMLError as e:
-            log.error(f"error decoding {data!r} as YAML.")
+            app_data = json.loads(data)
+        except json.JSONDecodeError as e:
+            log.error(f"error decoding {data!r} as JSON.")
             return None
-        ingress = app_data.get(self._charm.unit.name)
-        return ingress
+        return app_data
 
     @property
     def relation(self) -> Optional[Relation]:

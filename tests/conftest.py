@@ -43,7 +43,7 @@ SAMPLE_TRAEFIK_DATA_ENCODED = {
 
 
 # @pytest.hookimpl(hookwrapper=True)
-@pytest.fixture(autouse=True, scope='session')
+@pytest.fixture(autouse=True, scope='session') # FIXME this is broken
 def disable_caching():
     # We use the caching helpers from functools to save recalculations, but during
     # tests they can interfere with seeing the updated state, so we strip them off.

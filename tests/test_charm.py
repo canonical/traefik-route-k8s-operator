@@ -130,7 +130,7 @@ def test_ingress_response_flow(harness, charm):
     assert charm.ingress_per_unit.is_ready(charm._ipu_relation)
     # intercept and propagate
     assert charm._on_ingress_ready.called
-    original_on_ingress_ready(*charm._on_ingress_ready.call_args[1:])
+    original_on_ingress_ready(charm._on_ingress_ready.call_args.args[0])
 
     assert charm.ingress_per_unit.proxied_endpoints
 
