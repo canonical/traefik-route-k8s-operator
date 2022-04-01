@@ -87,6 +87,7 @@ LIBAPI = 0
 LIBPATCH = 4
 
 log = logging.getLogger(__name__)
+log.setLevel('DEBUG')
 
 # ======================= #
 #      LIBRARY GLOBS      #
@@ -589,21 +590,17 @@ class IngressRequest:
         return self._get_unit_data(self.units[0], key)
 
     def _get_unit_data(self, unit: Unit, key: str):
-        if self.units:
-            if unit in self.units:
-                unit_data = self._data[unit]
+        if unit in self.units:
+            unit_data = self._data[unit]
 
-                if key in unit_data:
-                    return unit_data[key]
-                else:
-                    log.warning(f'unable to get {key!r} from {unit}: '
-                                f'key not in relation databag')
+            if key in unit_data:
+                return unit_data[key]
             else:
-                log.warning(f'unable to get unit data for {unit}: '
-                            f'unit is not in relation')
+                log.warning(f'unable to get {key!r} from {unit}: '
+                            f'key not in relation databag')
         else:
-            log.warning('unable to get unit data: '
-                        'relation has no units')
+            log.warning(f'unable to get unit data for {unit}: '
+                        f'unit is not in relation')
         return None
 
     def respond(self, unit: Unit, url: str):
@@ -617,6 +614,8 @@ class IngressRequest:
             raise RelationException(self._relation, self.app)
 
         remote_unit_name = self.get_unit_name(unit)
+        if remote_unit_name is None:
+            raise RuntimeError("unable to get remote_unit_name")
 
         ingress = self._data[self._provider.charm.app].setdefault("ingress", {})
         ingress.setdefault(remote_unit_name, {})["url"] = url

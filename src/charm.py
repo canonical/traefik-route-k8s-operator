@@ -72,31 +72,33 @@ class TraefikRouteK8SCharm(CharmBase):
             logger.warning(f"more than one relation for {endpoint}")
         return relations[0]
 
+    @staticmethod
+    def _get_remote_unit_from_relation(relation: Optional[Relation]) -> Optional[Unit]:
+        if not relation:
+            return None
+        if not _check_has_one_unit(relation):
+            return None
+        return next(iter(relation.units))
+
     @property
     def _ipu_relation(self) -> Optional[Relation]:
+        """The relation with the unit requesting ingress."""
         return self._get_relation(self._ingress_endpoint)
 
     @property
-    def _remote_traefik_unit(self) -> Optional[Unit]:
-        """The traefik unit providing ingress."""
-        if not self._traefik_route_relation:
-            return None
-        if not _check_has_one_unit(self._traefik_route_relation):
-            return None
-        return next(iter(self._traefik_route_relation.units))
-
-    @property
     def _traefik_route_relation(self) -> Optional[Relation]:
+        """The relation with the (Traefik) charm providing traefik-route."""
         return self._get_relation(self._traefik_route_endpoint)
 
     @property
     def _remote_routed_unit(self) -> Optional[Unit]:
         """The remote unit in need of ingress."""
-        if not self._ipu_relation:
-            return None
-        if not _check_has_one_unit(self._ipu_relation):
-            return None
-        return next(iter(self._ipu_relation.units))
+        return self._get_remote_unit_from_relation(self._ipu_relation)
+
+    @property
+    def _remote_traefik_unit(self) -> Optional[Unit]:
+        """The traefik unit providing ingress."""
+        return self._get_remote_unit_from_relation(self._traefik_route_relation)
 
     @property
     def ingress_request(self) -> Optional[IngressRequest]:
@@ -217,7 +219,7 @@ class TraefikRouteK8SCharm(CharmBase):
             )
             return
 
-        self.ingress_request.respond(self._remote_traefik_unit, url)
+        self.ingress_request.respond(self._remote_routed_unit, url)
 
 
 if __name__ == "__main__":

@@ -62,8 +62,7 @@ def disable_caching():
                 setattr(cls, attr, property(prop.func))
             else:
                 setattr(cls, attr, prop.__wrapped__)
-
-            print(f'cleaned up: {attr}')
+            # print(f'cleaned up: {attr}')
 
     yield
 
