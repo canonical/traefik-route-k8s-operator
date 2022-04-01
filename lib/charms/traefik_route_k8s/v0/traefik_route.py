@@ -131,13 +131,13 @@ class TraefikRouteProvider(Object):
     """
     on = TraefikRouteProviderEvents()
 
-    def __init__(self, charm: CharmBase, endpoint: str = 'traefik_route'):
+    def __init__(self, charm: CharmBase, endpoint: str = 'traefik-route'):
         """Constructor for TraefikRouteProvider.
 
         Args:
             charm: The charm that is instantiating the instance.
             endpoint: The name of the relation endpoint to bind to
-                (defaults to "traefik_route").
+                (defaults to "traefik-route").
         """
         super().__init__(charm, endpoint)
         self.framework.observe(self.on[endpoint].relation_joined,
@@ -152,13 +152,15 @@ class TraefikNotReadyError(TraefikRouteException):
 
 
 class TraefikRouteRequirer(Object):
-    """Wrapper for the requirer side of traefik_route.
+    """Wrapper for the requirer side of traefik-route.
 
     traefik_route will publish to the application databag an object like:
     {
         'ingress': {
             'model': 'cos',
-            'unit': 'prometheus-k8s/0'
+            'unit': 'prometheus-k8s/0',
+            'host': 'foo/bar',
+            'port': 42
         },
         'config': {
             'rule': 'Host(`foo.bar/{{juju_unit}}`)'
@@ -175,52 +177,44 @@ class TraefikRouteRequirer(Object):
     """
     on = TraefikRouteRequirerEvents()
 
-    def __init__(self, charm: CharmBase, endpoint: str = 'traefik_route'):
+    def __init__(self, charm: CharmBase, relation, endpoint: str = 'traefik-route'):
         super(TraefikRouteRequirer, self).__init__(charm, endpoint)
         self._charm = charm
         self._endpoint = endpoint
+        self._relation = relation
 
-        self.framework.observe(charm.on[endpoint].relation_changed,
-                               self._on_relation_changed)
+    #     self.framework.observe(charm.on[endpoint].relation_changed,
+    #                            self._on_relation_changed)
+    #
+    # def _on_relation_changed(self, event):
+    #     if ingress := self._get_ingress(event.relation):
+    #         log.info('ingress ready')
+    #         self.on.ingress_ready.emit(event.relation, ingress)
 
-    def _on_relation_changed(self, event):
-        if ingress := self._get_ingress(event.relation):
-            log.info('ingress ready')
-            self.on.ingress_ready.emit(event.relation, ingress)
+    # def _get_ingress(self, relation: Relation):
+    #     data = relation.data[relation.app].get('data')
+    #     if not data:
+    #         return False
+    #     try:
+    #         app_data = json.loads(data)
+    #     except json.JSONDecodeError as e:
+    #         log.error(f"error decoding {data!r} as JSON.")
+    #         return None
+    #     return app_data
 
-    def _get_ingress(self, relation: Relation):
-        data = relation.data[relation.app].get('data')
-        if not data:
-            return False
-        try:
-            app_data = json.loads(data)
-        except json.JSONDecodeError as e:
-            log.error(f"error decoding {data!r} as JSON.")
-            return None
-        return app_data
+    # @property
+    # def proxied_endpoint(self) -> Optional[str]:
+    #     """Return the ingress url provided to this unit by the traefik charm."""
+    #     relation = self.relation
+    #     if not relation or not (app_data := relation.data.get(relation.app)):
+    #         return None
+    #     raw_data = app_data['traefik_route']
+    #     data = _deserialize_data(raw_data)
+    #     endpoint = data.get(self._charm.unit.name, {}).get('url')
+    #     return endpoint
 
-    @property
-    def relation(self) -> Optional[Relation]:
-        """Retrieves the traefik_route relation databag."""
-        relations = self._charm.model.relations.get(self._endpoint)
-        if relations:
-            # Only one traefik_route can be active at once on the requirer's
-            # side.
-            return relations[0]
-
-    @property
-    def proxied_endpoint(self) -> Optional[str]:
-        """Return the ingress url provided to this unit by the traefik charm."""
-        relation = self.relation
-        if not relation or not (app_data := relation.data.get(relation.app)):
-            return None
-        raw_data = app_data['traefik_route']
-        data = _deserialize_data(raw_data)
-        endpoint = data.get(self._charm.unit.name, {}).get('url')
-        return endpoint
-
-    def relay_ingress_request(self, ingress, config):
-        """Relay ingress request of a charm running on `unit` inside `model`.
+    def submit_to_traefik(self, name, config):
+        """Relay a charm's ingress request to traefik.
 
         Call this when the ingress relation between route charm and
         'ingress end-consumer' charm is ready; aka the end-consumer charm has
@@ -229,6 +223,5 @@ class TraefikRouteRequirer(Object):
         if not self._charm.unit.is_leader():
             raise UnauthorizedError()
 
-        app_databag = self.relation.data[self._charm.app]
-        app_databag['config'] = _serialize_data(config)
-        app_databag['ingress'] = _serialize_data(ingress)
+        app_databag = self._relation.data[self._charm.app]
+        app_databag.setDefault('config', {})[name] = _serialize_data(config)

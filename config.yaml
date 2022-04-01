@@ -27,3 +27,36 @@ options:
         Host(`foo.bar/cos-prometheus-0`)
 
     type: string
+
+  url:
+    default:
+    description: >
+      The url to advertise to the unit in need of ingress.
+
+      The value of the field is going to be processed in exactly the same way as
+      the `rule` field. The assumption is that the url is going to match
+      the rule; however, we have no way to validate and/or enforce this condition;
+      so beware!
+      For example, given a downstream unit called `prometheus/0` in the `cos` model, the 
+      following configuration is valid:
+
+        rule="Host(`foo.bar/{{juju_model}}-{{juju_unit}}/`)"
+        url="foo.bar/{{juju_model}}-{{juju_unit}}"
+      
+      while the following configuration is not:
+      
+        rule="Host(`foo.bar/{{juju_model}}-{{juju_unit}}`) || 
+             HostRegexp(`{subdomain:[a-z]+}.foo.bar`) || 
+             Host(`doobadooba.com`)"
+        url="ab.foo.bar/{{juju_model}}-{{juju_unit}}"
+      
+      The reason why this is not valid is that the url does not match the rule:
+      so the url advertised to the unit will not in fact be routed correctly by Traefik.
+      Examples of good url values for this case would be:
+      
+        url="foo.bar/{{juju_model}}-{{juju_unit}}"
+        url="baz.foo.bar" 
+        url="qux.foo.bar" 
+        url="doobadooba.com" 
+
+    type: string

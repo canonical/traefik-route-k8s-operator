@@ -3,15 +3,15 @@
 import json
 from unittest.mock import Mock
 
+import pytest
 from ops.model import ActiveStatus, BlockedStatus
 
-from tests.conftest import (
+from conftest import (
     REMOTE_UNIT_NAME, SAMPLE_CONFIG, SAMPLE_INGRESS_DATA,
     mock_config, mock_happy_path, MODEL_NAME, TRAEFIK_UNIT_NAME,
     SAMPLE_TRAEFIK_DATA, TRAEFIK_APP_NAME, SAMPLE_INGRESS_DATA_ENCODED,
     SAMPLE_TRAEFIK_DATA_ENCODED
 )
-
 
 def test_baseline(harness, charm):
     assert charm._ipu_relation is None

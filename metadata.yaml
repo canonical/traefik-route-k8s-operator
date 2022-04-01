@@ -12,13 +12,13 @@ summary: |
   Configuration charm for traefik-k8s. Flexible ingress-per-unit provider.
 
 provides:
-    ingress_per_unit:
+    ingress-per-unit:
         interface: ingress_per_unit
         limit: 1
         optional: false
 
 requires:
-    traefik_route:
+    traefik-route:
         interface: traefik_route
         limit: 1
         optional: false
