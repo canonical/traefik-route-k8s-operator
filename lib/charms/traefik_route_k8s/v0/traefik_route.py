@@ -213,15 +213,14 @@ class TraefikRouteRequirer(Object):
     #     endpoint = data.get(self._charm.unit.name, {}).get('url')
     #     return endpoint
 
-    def submit_to_traefik(self, name, config):
+    def submit_to_traefik(self, config):
         """Relay a charm's ingress request to traefik.
 
-        Call this when the ingress relation between route charm and
-        'ingress end-consumer' charm is ready; aka the end-consumer charm has
-        provided the ingress data.
+        This will publish to TraefikRoute's traefik-route relation databag
+        the config traefik needs to route the units behind this charm.
         """
         if not self._charm.unit.is_leader():
             raise UnauthorizedError()
 
         app_databag = self._relation.data[self._charm.app]
-        app_databag.setDefault('config', {})[name] = _serialize_data(config)
+        app_databag['config'] = _serialize_data(config)

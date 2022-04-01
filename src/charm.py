@@ -96,7 +96,7 @@ class TraefikRouteK8SCharm(CharmBase):
         self.ingress_per_unit = IngressPerUnitProvider(
             self, self._ingress_endpoint)
         self.traefik_route = TraefikRouteRequirer(
-            self,  self._traefik_route_relation,
+            self, self._traefik_route_relation,
             self._traefik_route_endpoint)
 
         # if the remote app (traefik) has published the url: we give it
@@ -120,7 +120,8 @@ class TraefikRouteK8SCharm(CharmBase):
         return relations[0]
 
     @staticmethod
-    def _get_remote_units_from_relation(relation: Optional[Relation]) -> Tuple[Unit]:
+    def _get_remote_units_from_relation(relation: Optional[Relation]) -> Tuple[
+        Unit]:
         if not relation:
             return ()
         return tuple(relation.units)
@@ -145,7 +146,8 @@ class TraefikRouteK8SCharm(CharmBase):
         """The traefik unit providing ingress.
 
         We're going to assume there's only one."""
-        traefik_units = self._get_remote_units_from_relation(self._traefik_route_relation)
+        traefik_units = self._get_remote_units_from_relation(
+            self._traefik_route_relation)
         if not traefik_units:
             return None
         return traefik_units[0]
@@ -257,65 +259,22 @@ class TraefikRouteK8SCharm(CharmBase):
 
         # merge configs?
         config = self._merge_traefik_configs(traefik_configs)
-        self.traefik_route.submit_to_traefik()
-
-    def _relay_ingress_request(self, unit):
-        # we assume everything is ready: IPU, traefik_route,
-        # and config is clean.
-        # ingress_request should not be None since ipu is available.
-        ingress_request: IngressRequest = self.ingress_request
-
-        # we need all 'raw' data from the unit
-        ingress = ingress_request._data[ingress_request.units[0]]
-
-        self.traefik_route.submit_to_traefik(unit_name, traefik_config)
-
-    # def _on_ingress_ready(self, event: TraefikRouteIngressReadyEvent):
-    #     """Traefik has published ingress data via `traefik_route`.
-    #
-    #     We are going to publish it forward to the charm requesting ingress via
-    #     ingress_per_unit.
-    #     """
-    #     self._remote_routed_units
-    #     ingress_request: IngressRequest = self.ingress_request
-    #     remote_unit_name = ingress_request._data[ingress_request.units[0]][
-    #         'name']
-    #
-    #     remote_unit_ingress_data = event.ingress.get(remote_unit_name)
-    #     if not remote_unit_ingress_data:
-    #         logger.debug(f'ingress is ready but no ingress for '
-    #                      f'{remote_unit_name} has been shared yet; '
-    #                      f'deferring ingress_ready')
-    #         self.unit.status = WaitingStatus('Waiting for ingress...')
-    #         return event.defer()
-    #
-    #     # should we be checking that it is a dict?
-    #     url = remote_unit_ingress_data.get('url')
-    #     if not url:
-    #         logger.debug(f'traefik shared ingress data for {remote_unit_name}; '
-    #                      f'but it has an unexpected format. '
-    #                      f'{remote_unit_ingress_data!r}')
-    #         self.unit.status = BlockedStatus(
-    #             f"Traefik shared badly formatted data."
-    #         )
-    #         return
-    #
-    #     self.ingress_request.respond(self._remote_routed_unit, url)
+        self.traefik_route.submit_to_traefik(config=config)
 
     def _generate_traefik_config_data(self, rule: str, config_id: str,
                                       url: str) -> dict:
-        config = {"http": {"routers": {}, "services": {}}}
+        config = {"router": {}, "service": {}}
 
         traefik_router_name = f"juju-{config_id}-router"
         traefik_service_name = f"juju-{config_id}-service"
 
-        config["http"]["routers"][traefik_router_name] = {
+        config["router"][traefik_router_name] = {
             "rule": rule,
             "service": traefik_service_name,
             "entryPoints": ["web"],
         }
 
-        config["http"]["services"][traefik_service_name] = {
+        config["service"][traefik_service_name] = {
             "loadBalancer": {
                 "servers": [{"url": url}]
             }
@@ -326,10 +285,11 @@ class TraefikRouteK8SCharm(CharmBase):
         master_config = {"http": {"routers": {}, "services": {}}}
 
         for config in configs:
-            master_config["http"]['routers'].update(config['http']['routers'])
-            master_config["http"]['services'].update(config['http']['services'])
+            master_config["http"]['routers'].update(config['router'])
+            master_config["http"]['services'].update(config['service'])
 
         return master_config
+
 
 if __name__ == "__main__":
     main(TraefikRouteK8SCharm)
