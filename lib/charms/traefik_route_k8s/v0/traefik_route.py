@@ -183,6 +183,10 @@ class TraefikRouteRequirer(Object):
         self._endpoint = endpoint
         self._relation = relation
 
+    def is_ready(self):
+        """Is the TraefikRouteRequirer ready to submit data to Traefik?"""
+        return self._relation is not None
+
     #     self.framework.observe(charm.on[endpoint].relation_changed,
     #                            self._on_relation_changed)
     #

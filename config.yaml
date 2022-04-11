@@ -16,19 +16,24 @@ options:
          proxied application.
        - {{juju_unit}} resolves to the unit name of the downstream proxied unit;
          to avoid issues when used together with the Host directive or similar, 
-         the slash character between application name and unit index is replaced with a dash.
+         the slash character between application name and unit index is replaced by a dash.
 
       For example, given a downstream unit called `prometheus/0` in the `cos` model, the following:
 
-        Host(`foo.bar/{{juju_model}}-{{juju_unit}}`)
+        Host(`foo.bar/{{juju_unit}}-{{juju_model}}`)
 
       would evaluate to:
 
         Host(`foo.bar/cos-prometheus-0`)
+      
+      If the host is omitted, but the root_url is provided, the charm will 
+      extract the hostname from the url and generate a Host rule for you.
+        root_url=`http://{{juju_unit}}.bar.baz:80/qux`
+        --> rule=Host(`{{juju_unit}}.bar.baz`)
 
     type: string
 
-  url:
+  root_url:
     default:
     description: >
       The url to advertise to the unit in need of ingress.
@@ -40,23 +45,28 @@ options:
       For example, given a downstream unit called `prometheus/0` in the `cos` model, the 
       following configuration is valid:
 
-        rule="Host(`foo.bar/{{juju_model}}-{{juju_unit}}/`)"
-        url="foo.bar/{{juju_model}}-{{juju_unit}}"
+        rule="Host(`{{juju_unit}}.{{juju_model}}.foo.bar`)"
+        root_url="http://{{juju_unit}}.{{juju_model}}.foo.bar/baz"
       
       while the following configuration is not:
       
-        rule="Host(`foo.bar/{{juju_model}}-{{juju_unit}}`) || 
+        rule="Host(`{{juju_model}}-{{juju_unit}}.foo.bar`) || 
              HostRegexp(`{subdomain:[a-z]+}.foo.bar`) || 
              Host(`doobadooba.com`)"
-        url="ab.foo.bar/{{juju_model}}-{{juju_unit}}"
+        root_url="ka-ching.com"
       
       The reason why this is not valid is that the url does not match the rule:
       so the url advertised to the unit will not in fact be routed correctly by Traefik.
-      Examples of good url values for this case would be:
+      Note that Traefik will still work 'correctly', i.e. the application will be 
+      reachable at (for example) `http://doobadooba.com`.
+      Examples of 'good' root_url values for this case would be:
       
-        url="foo.bar/{{juju_model}}-{{juju_unit}}"
-        url="baz.foo.bar" 
-        url="qux.foo.bar" 
-        url="doobadooba.com" 
+        root_url="{{juju_model}}-{{juju_unit}}.foo.bar/baz"
+        root_url="baz.foo.bar" 
+        root_url="doobadooba.com/choo" 
+      
+      If the root_url begins with `/`, we will fill in the host and port for you:
+        root_url="/baz/" 
+      will become: `http://{external-hostname | loadbalancer ip}:{port}/baz/`
 
     type: string
