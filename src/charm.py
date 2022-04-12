@@ -9,46 +9,34 @@
 import logging
 from dataclasses import dataclass
 from itertools import starmap
-from typing import Iterable, Optional, Protocol, Sequence, Tuple
+from typing import Iterable, Optional, Tuple
 from urllib.parse import urlparse
 
-from charms.traefik_k8s.v0.ingress_per_unit import (IngressPerUnitProvider,
-                                                    RequirerData)
+from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, RequirerData
 from charms.traefik_route_k8s.v0.traefik_route import (
-    TraefikRouteIngressReadyEvent, TraefikRouteRequestEvent,
-    TraefikRouteRequirer)
+    TraefikRouteRequestEvent,
+    TraefikRouteRequirer,
+)
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import (ActiveStatus, BlockedStatus, Relation, Unit,
-                       WaitingStatus)
+from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
+
+from types import UnitConfig, TraefikConfig
 
 logger = logging.getLogger(__name__)
 
 
-class _HasUnits(Protocol):
-    @property
-    def units(self) -> Sequence[Unit]:
-        pass
-
-
 class RuleDerivationError(RuntimeError):
-    def __init__(self, url, *args, **kwargs):
+    def __init__(self, url, *args):
         msg = f"Unable to derive Rule from {url}; ensure that the url is valid."
-        super(RuleDerivationError, self).__init__(msg, *args, **kwargs)
+        super(RuleDerivationError, self).__init__(msg, *args)
 
-
-def _check_has_one_unit(obj: _HasUnits):
-    """Checks that the obj has at least one unit."""
-    if not obj.units:
-        logger.error(f"{obj} has no units")
-        return False
-    return True
 
 
 @dataclass
 class RouteConfig:
-    rule: str
     root_url: str
+    rule: str
     id_: str
 
 
@@ -132,6 +120,11 @@ class TraefikRouteK8SCharm(CharmBase):
         self.traefik_route = TraefikRouteRequirer(
             self, self._traefik_route_relation, self._traefik_route_endpoint
         )
+
+        if not self.unit.is_leader():
+            self.unit.status = BlockedStatus("Traefik-Route cannot be scaled > n1.")
+            # skip initializing the listeners: charm will be dead unreactive
+            return
 
         observe = self.framework.observe
         observe(self.on.config_changed, self._on_config_changed)
@@ -284,19 +277,15 @@ class TraefikRouteK8SCharm(CharmBase):
         traefik_unit: Unit = self._remote_traefik_unit
         relation = self._ipu_relation
 
-        traefik_configs = []
+        unit_configs = []
         ready_units = filter(
             lambda unit_: ingress.is_unit_ready(relation, unit_), relation.units
         )
         for unit in ready_units:  # units requesting ingress
             unit_data = ingress.get_data(self._ipu_relation, unit, validate=True)
-            config = self._config_for_unit(unit_data)
-
-            traefik_config = self._generate_traefik_config_data(
-                config.rule, config.id_, config.root_url
-            )
-
-            traefik_configs.append(traefik_config)
+            config_data = self._config_for_unit(unit_data)
+            unit_config = self._generate_traefik_unit_config(config_data)
+            unit_configs.append(unit_config)
 
             # FIXME:
             #  we can publish the url to the unit immediately, but this might race
@@ -304,40 +293,45 @@ class TraefikRouteK8SCharm(CharmBase):
             #  tell us the url, but Traefik needs the config before it can start routing.
             #  Consider whether we should only forward the url to the unit after Traefik
             #  gives us some kind of ok.
-            ingress.publish_url(relation, unit_data["name"], config.root_url)
+            ingress.publish_url(relation, unit_data["name"], config_data.root_url)
 
         # merge configs?
-        config = self._merge_traefik_configs(traefik_configs)
+        config = self._merge_traefik_configs(unit_configs)
         if self.traefik_route.is_ready():
             self.traefik_route.submit_to_traefik(config=config)
 
     @staticmethod
-    def _generate_traefik_config_data(rule: str, config_id: str, url: str) -> dict:
-        config = {"router": {}, "service": {}}
+    def _generate_traefik_unit_config(config: RouteConfig) -> UnitConfig:
+        rule, config_id, url = config.rule, config.id_, config.root_url
 
         traefik_router_name = f"juju-{config_id}-router"
         traefik_service_name = f"juju-{config_id}-service"
 
-        config["router"][traefik_router_name] = {
-            "rule": rule,
-            "service": traefik_service_name,
-            "entryPoints": ["web"],
-        }
-
-        config["service"][traefik_service_name] = {
-            "loadBalancer": {"servers": [{"url": url}]}
+        config: UnitConfig = {
+            "router": {
+                "rule": rule,
+                "service": traefik_service_name,
+                "entryPoints": ["web"],
+            },
+            "router_name": traefik_router_name,
+            "service": {"loadBalancer": {"servers": [{"url": url}]}},
+            "service_name": traefik_service_name,
         }
         return config
 
     @staticmethod
-    def _merge_traefik_configs(configs: Iterable[dict]) -> dict:
-        master_config = {"http": {"routers": {}, "services": {}}}
-
-        for config in configs:
-            master_config["http"]["routers"].update(config["router"])
-            master_config["http"]["services"].update(config["service"])
-
-        return master_config
+    def _merge_traefik_configs(configs: Iterable[UnitConfig]) -> TraefikConfig:
+        traefik_config = {
+            "http": {
+                "routers": {
+                    config["router_name"]: config["router"] for config in configs
+                },
+                "services": {
+                    config["service_name"]: config["service"] for config in configs
+                },
+            }
+        }
+        return traefik_config
 
 
 if __name__ == "__main__":

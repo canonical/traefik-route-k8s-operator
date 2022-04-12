@@ -33,7 +33,8 @@ SAMPLE_TRAEFIK_DATA_ENCODED = {"data": json.dumps(SAMPLE_TRAEFIK_DATA["data"])}
 @pytest.fixture
 def harness() -> Harness[TraefikRouteK8SCharm]:
     harness = Harness(TraefikRouteK8SCharm)
-    harness.set_leader(True)  # this charm can't be scaled
+    harness.set_leader(True)
+    # this charm can't be scaled, so we won't ever need leadership checks
     harness.begin_with_initial_hooks()
     yield harness
     harness.cleanup()
@@ -45,10 +46,6 @@ def mock_ipu_relation(harness: Harness):
         TraefikRouteK8SCharm._ingress_endpoint, REMOTE_APP_NAME
     )
     harness.add_relation_unit(ipu_relation_id, REMOTE_UNIT_NAME)
-    # harness.update_relation_data(
-    #     ipu_relation_id,
-    #     REMOTE_UNIT_NAME,
-    #     {"data": data})
     return ipu_relation_id
 
 

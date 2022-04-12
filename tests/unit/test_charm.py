@@ -6,13 +6,19 @@ from unittest.mock import Mock
 import pytest
 from ops.model import ActiveStatus, BlockedStatus
 
-from tests.unit.conftest import (MODEL_NAME, REMOTE_UNIT_NAME, SAMPLE_CONFIG,
-                                 SAMPLE_INGRESS_DATA,
-                                 SAMPLE_INGRESS_DATA_ENCODED,
-                                 SAMPLE_TRAEFIK_DATA,
-                                 SAMPLE_TRAEFIK_DATA_ENCODED, TRAEFIK_APP_NAME,
-                                 TRAEFIK_UNIT_NAME, mock_config,
-                                 mock_happy_path)
+from tests.unit.conftest import (
+    MODEL_NAME,
+    REMOTE_UNIT_NAME,
+    SAMPLE_CONFIG,
+    SAMPLE_INGRESS_DATA,
+    SAMPLE_INGRESS_DATA_ENCODED,
+    SAMPLE_TRAEFIK_DATA,
+    SAMPLE_TRAEFIK_DATA_ENCODED,
+    TRAEFIK_APP_NAME,
+    TRAEFIK_UNIT_NAME,
+    mock_config,
+    mock_happy_path,
+)
 
 EXPECTED_TRAEFIK_CONFIG = {
     "http": {
