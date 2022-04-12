@@ -26,8 +26,8 @@ SAMPLE_INGRESS_DATA = {
 }
 SAMPLE_INGRESS_DATA_ENCODED = {"data": json.dumps(SAMPLE_INGRESS_DATA["data"])}
 # mock of the data traefik might share when providing ingress to our remote unit
-SAMPLE_TRAEFIK_DATA = {"data": {REMOTE_UNIT_NAME: {"url": "https://foo.bar/baz"}}}
-SAMPLE_TRAEFIK_DATA_ENCODED = {"data": json.dumps(SAMPLE_TRAEFIK_DATA["data"])}
+SAMPLE_TRAEFIK_DATA = {REMOTE_UNIT_NAME: {"url": "https://foo.bar/baz"}}
+SAMPLE_TRAEFIK_DATA_ENCODED = {"ingress": json.dumps(SAMPLE_TRAEFIK_DATA)}
 
 
 @pytest.fixture

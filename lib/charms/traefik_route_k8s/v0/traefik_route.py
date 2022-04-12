@@ -70,7 +70,7 @@ def _deserialize_data(data):
 
 
 def _serialize_data(data):
-    return json.dumps(data, indent=2)
+    return
 
 
 class TraefikRouteException(RuntimeError):
@@ -81,70 +81,100 @@ class UnauthorizedError(TraefikRouteException):
     """Raised when the unit needs leadership to perform some action."""
 
 
-class TraefikRouteRequestEvent(RelationEvent):
-    """Event representing an incoming request.
-
-    This is equivalent to the "ready" event, but is more meaningful.
-    """
+class TraefikRouteProviderReadyEvent(RelationEvent):
+    """Event emitted when Traefik is ready to provide ingress for a routed unit."""
 
 
-class TraefikRouteIngressReadyEvent(RelationEvent):
-    """Event representing a ready state from the traefik charm."""
-    def __init__(self, handle, relation, ingress, app=None, unit=None):
-        super().__init__(handle, relation, app=app, unit=unit)
-        self.ingress = ingress
-
-    def snapshot(self) -> dict:
-        """Used by the framework to serialize the event to disk.
-
-        Not meant to be called by charm code.
-        """
-        snap = super().snapshot()
-        snap['ingress'] = self.ingress
-        return snap
-
-    def restore(self, snapshot: dict) -> None:
-        """Used by the framework to deserialize the event from disk.
-
-        Not meant to be called by charm code.
-        """
-        self.ingress = snapshot.pop('ingress')
-        super().restore(snapshot)
+class TraefikRouteRequirerReadyEvent(RelationEvent):
+    """Event emitted when a unit requesting ingress has provided all data Traefik needs."""
+    # def __init__(self, handle, relation, ingress, app=None, unit=None):
+    #     super().__init__(handle, relation, app=app, unit=unit)
+    #     self.ingress = ingress
+    #
+    # def snapshot(self) -> dict:
+    #     """Used by the framework to serialize the event to disk.
+    #
+    #     Not meant to be called by charm code.
+    #     """
+    #     snap = super().snapshot()
+    #     snap['ingress'] = self.ingress
+    #     return snap
+    #
+    # def restore(self, snapshot: dict) -> None:
+    #     """Used by the framework to deserialize the event from disk.
+    #
+    #     Not meant to be called by charm code.
+    #     """
+    #     self.ingress = snapshot.pop('ingress')
+    #     super().restore(snapshot)
 
 
 class TraefikRouteProviderEvents(CharmEvents):
-    """Container for TRP events."""
-    ready = EventSource(TraefikRouteRequestEvent)
+    """Container for TraefikRouteProvider events."""
+    # ready = EventSource(TraefikRouteProviderReadyEvent)
 
 
 class TraefikRouteRequirerEvents(CharmEvents):
-    """Container for TRR events."""
-    ingress_ready = EventSource(TraefikRouteIngressReadyEvent)
+    """Container for TraefikRouteRequirer events."""
+    ready = EventSource(TraefikRouteRequirerReadyEvent)
 
 
 class TraefikRouteProvider(Object):
     """Implementation of the provider of traefik_route.
 
     This will presumably be owned by a Traefik charm.
-    The main idea is that traefik will observe the `request` event and, upon
-    receiving it, will
+    The main idea is that Traefik will observe the `ready` event and, upon
+    receiving it, will fetch the config from the TraefikRoute's application databag,
+    apply it, and update its own app databag to let Route know that the ingress
+    is there.
     """
-    on = TraefikRouteProviderEvents()
+    # on = TraefikRouteProviderEvents()
 
-    def __init__(self, charm: CharmBase, endpoint: str = 'traefik-route'):
+    def __init__(self, charm: CharmBase, relation_name: str = 'traefik-route'):
         """Constructor for TraefikRouteProvider.
 
         Args:
             charm: The charm that is instantiating the instance.
-            endpoint: The name of the relation endpoint to bind to
+            relation_name: The name of the relation relation_name to bind to
                 (defaults to "traefik-route").
         """
-        super().__init__(charm, endpoint)
-        self.framework.observe(self.on[endpoint].relation_joined,
-                               self._emit_ready_event)
+        super().__init__(charm, relation_name)
+        self.charm = charm
 
-    def _emit_ready_event(self, event):
-        self.on.ready.emit(event.relation)
+    @staticmethod
+    def is_ready(relation: Relation):
+        """Whether TraefikRoute is ready on this relation: i.e. the remote app shared the config."""
+        return 'config' in relation.data[relation.app]
+
+    @staticmethod
+    def get_config(relation: Relation):
+        """Retrieve the config published by the remote application."""
+        # todo validate this config
+        return relation.data[relation.app]['config']
+
+    def publish_ingress(self, relation: Relation):
+        """Publish ingress to Traefik Route."""
+        remote_units = (unit for unit in relation.units if unit is not self.charm.unit)
+
+        # FIXME: where to fetch unit name for CMR case?
+        #  should TR publish a list of unit names?
+        ingress_data = {"ingress": {unit.name: {} for unit in remote_units}}
+        relation.data[self.charm.app]['ingress'] = ingress_data
+
+    def wipe_ingress_data(self, relation: Relation):
+        """Remove all ingress data."""
+        relation.data[self.charm.app]['ingress'] = ''
+
+    #     self.framework.observe(self.on[relation_name].relation_changed,
+    #                            self._check_ready)
+    #
+    # def _is_unit_ready(self, unit: Unit):
+    #
+    #     return True
+    #
+    # def _check_ready(self, event):
+    #     if self._is_unit_ready(self.charm.unit):
+    #         self.on.ready.emit(event.relation)
 
 
 class TraefikNotReadyError(TraefikRouteException):
@@ -169,10 +199,9 @@ class TraefikRouteRequirer(Object):
     """
     on = TraefikRouteRequirerEvents()
 
-    def __init__(self, charm: CharmBase, relation, endpoint: str = 'traefik-route'):
-        super(TraefikRouteRequirer, self).__init__(charm, endpoint)
+    def __init__(self, charm: CharmBase, relation: Relation, relation_name: str = 'traefik-route'):
+        super(TraefikRouteRequirer, self).__init__(charm, relation_name)
         self._charm = charm
-        self._endpoint = endpoint
         self._relation = relation
 
     def is_ready(self):
@@ -189,7 +218,14 @@ class TraefikRouteRequirer(Object):
             raise UnauthorizedError()
 
         app_databag = self._relation.data[self._charm.app]
-        app_databag['config'] = _serialize_data(config)
+        # indent for readability on debugging tools
+        app_databag['config'] = json.dumps(config, indent=2)
 
-        # we emit the ready immediately, although...
-        self.on.ready.emit(self._relation)
+    @property
+    def ingress(self) -> Optional[dict]:
+        """Retrieve ingress from Traefik."""
+        remote_app_data = self._relation.data[self._relation.app]
+        ingress = remote_app_data.get('ingress')
+        if ingress:
+            return json.loads(ingress)
+        return None

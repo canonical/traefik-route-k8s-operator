@@ -7,6 +7,7 @@
 """
 
 import logging
+import typing
 from dataclasses import dataclass
 from itertools import starmap
 from typing import Iterable, Optional, Tuple
@@ -14,14 +15,15 @@ from urllib.parse import urlparse
 
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, RequirerData
 from charms.traefik_route_k8s.v0.traefik_route import (
-    TraefikRouteRequestEvent,
+    TraefikRouteProviderReadyEvent, TraefikRouteRequirerReadyEvent,
     TraefikRouteRequirer,
 )
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
 
-from types import UnitConfig, TraefikConfig
+# if typing.TYPE_CHECKING:
+from types_ import UnitConfig, TraefikConfig
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,6 @@ class RuleDerivationError(RuntimeError):
     def __init__(self, url, *args):
         msg = f"Unable to derive Rule from {url}; ensure that the url is valid."
         super(RuleDerivationError, self).__init__(msg, *args)
-
 
 
 @dataclass
@@ -110,15 +111,14 @@ class _RouteConfig:
 class TraefikRouteK8SCharm(CharmBase):
     """Charm the service."""
 
-    _ingress_endpoint = "ingress-per-unit"
-    _traefik_route_endpoint = "traefik-route"
+    _ingress_relation_name = "ingress-per-unit"
+    _traefik_route_relation_name = "traefik-route"
 
     def __init__(self, *args):
         super().__init__(*args)
-
-        self.ingress_per_unit = IngressPerUnitProvider(self, self._ingress_endpoint)
+        self.ingress_per_unit = IngressPerUnitProvider(self, self._ingress_relation_name)
         self.traefik_route = TraefikRouteRequirer(
-            self, self._traefik_route_relation, self._traefik_route_endpoint
+            self, self._traefik_route_relation, self._traefik_route_relation_name
         )
 
         if not self.unit.is_leader():
@@ -128,7 +128,12 @@ class TraefikRouteK8SCharm(CharmBase):
 
         observe = self.framework.observe
         observe(self.on.config_changed, self._on_config_changed)
-        observe(self.ingress_per_unit.on.request, self._on_ingress_request)
+        observe(self.ingress_per_unit.on.ready, self._on_ingress_ready)
+        observe(self.on[self._traefik_route_relation_name].relation_changed,
+                self._on_route_ready)
+
+        # todo wipe all data if and when TR 'stops' being ready
+        #  (e.g. config change breaks the config)
 
     def _get_relation(self, endpoint: str) -> Optional[Relation]:
         """Fetches the Relation for endpoint and checks that there's only 1."""
@@ -151,12 +156,12 @@ class TraefikRouteK8SCharm(CharmBase):
     @property
     def _ipu_relation(self) -> Optional[Relation]:
         """The relation with the unit requesting ingress."""
-        return self._get_relation(self._ingress_endpoint)
+        return self._get_relation(self._ingress_relation_name)
 
     @property
     def _traefik_route_relation(self) -> Optional[Relation]:
         """The relation with the (Traefik) charm providing traefik-route."""
-        return self._get_relation(self._traefik_route_endpoint)
+        return self._get_relation(self._traefik_route_relation_name)
 
     @property
     def _remote_routed_units(self) -> Tuple[Unit]:
@@ -173,6 +178,7 @@ class TraefikRouteK8SCharm(CharmBase):
         )
         if not traefik_units:
             return None
+        assert len(traefik_units) == 1, 'There should be exactly 1 remote Traefik unit.'
         return traefik_units[0]
 
     @property
@@ -198,34 +204,38 @@ class TraefikRouteK8SCharm(CharmBase):
 
     def _on_config_changed(self, _):
         """Check the config; set an active status if all is good."""
-        if not self._config.is_valid:
-            # we block until the user fixes the config
-            self.unit.status = BlockedStatus("bad config; see logs for more")
+        if not self._is_ready:
+            # also checks self._is_configuration_valid
             return
 
-        if self._is_ready():
-            self._update()
-
+        self._update()
         self.unit.status = ActiveStatus()
 
-    def _is_ready(self):
-        # check that the charm config is ok
+    @property
+    def _is_configuration_valid(self):
+        """This charm is available if it's correctly configured."""
         if not self._config.is_valid:
             self.unit.status = BlockedStatus("bad config; see logs for more")
+            return False
+
+        return True
+
+    @property
+    def _is_ready(self):
+        # check that the charm config is ok
+        if not self._is_configuration_valid:
             return False
 
         # validate IPU relation status
         ipu_relation = self._ipu_relation
         if not ipu_relation:
             self.unit.status = BlockedStatus(
-                f"Ingress requested, but ingress-per-unit relation is "
-                f"not available."
+                f"Awaiting to be related via ingress-per-unit."
             )
             return False
         elif self.ingress_per_unit.is_failed(ipu_relation):
             self.unit.status = BlockedStatus(
-                f"Ingress requested, but ingress-per-unit relation is"
-                f"broken (failed)."
+                f"ingress-per-unit relation is broken (failed)."
             )
             return False
         elif not self.ingress_per_unit.is_available(ipu_relation):
@@ -242,14 +252,56 @@ class TraefikRouteK8SCharm(CharmBase):
 
         return True
 
-    def _on_ingress_request(self, event: TraefikRouteRequestEvent):
-        if not self._is_ready():
+    def _on_ingress_ready(self, event: TraefikRouteRequirerReadyEvent):
+        """The route requirer (aka this charm) is ready.
+
+         That is, it can forward to Traefik the config Traefik will need to provide ingress.
+         """
+        if not self._is_ready:
             return event.defer()
 
         logger.info(
-            "Ingress request event received. IPU ready; " "TR ready; Relaying..."
+            "TraefikRouteRequirerReadyEvent received. IPU ready; TR ready; Relaying..."
         )
         self._update()
+        self.unit.status = ActiveStatus()
+
+    def _on_route_ready(self, event: TraefikRouteProviderReadyEvent):
+        """The route provider (aka Traefik) is ready to provide ingress."""
+        if not self._is_ready:
+            return event.defer()
+
+        logger.info(
+            "TraefikRouteProviderReadyEvent received. IPU ready; TR ready; Relaying..."
+        )
+        self._publish_ingress()
+        self.unit.status = ActiveStatus()
+
+    def _publish_ingress(self):
+        """Publish ingress data to the routed application."""
+        ingress_data = self.traefik_route.ingress
+        if not ingress_data:
+            logger.info('traefik has not provided any ingress yet')
+            return
+
+        # todo validate input data here
+        logger.info('publishing ingress...')
+
+        # we add to the ingress data the urls we already know.
+        for unit in self._remote_routed_units:
+            if not self.ingress_per_unit.is_unit_ready(self._ipu_relation, unit):
+                # ipu not ready yet
+                logger.info(f"{unit} ipu not ready yet")
+                continue
+            unit_data = self.ingress_per_unit.get_data(self._ipu_relation, unit)
+            unit_name = unit_data['name']
+            if not ingress_data.get(unit_name):
+                # route not ready yet
+                logger.info(f"{unit_name} route not ready yet")
+                continue
+
+            config = self._config_for_unit(unit_data)
+            self.ingress_per_unit.publish_url(self._ipu_relation, unit_name, config.root_url)
 
     def _config_for_unit(self, unit_data: RequirerData) -> RouteConfig:
         """Get the _RouteConfig for the provided `unit_data`."""
@@ -282,7 +334,7 @@ class TraefikRouteK8SCharm(CharmBase):
             lambda unit_: ingress.is_unit_ready(relation, unit_), relation.units
         )
         for unit in ready_units:  # units requesting ingress
-            unit_data = ingress.get_data(self._ipu_relation, unit, validate=True)
+            unit_data = ingress.get_data(self._ipu_relation, unit)
             config_data = self._config_for_unit(unit_data)
             unit_config = self._generate_traefik_unit_config(config_data)
             unit_configs.append(unit_config)
@@ -301,13 +353,13 @@ class TraefikRouteK8SCharm(CharmBase):
             self.traefik_route.submit_to_traefik(config=config)
 
     @staticmethod
-    def _generate_traefik_unit_config(config: RouteConfig) -> UnitConfig:
+    def _generate_traefik_unit_config(config: RouteConfig) -> 'UnitConfig':
         rule, config_id, url = config.rule, config.id_, config.root_url
 
         traefik_router_name = f"juju-{config_id}-router"
         traefik_service_name = f"juju-{config_id}-service"
 
-        config: UnitConfig = {
+        config: 'UnitConfig' = {
             "router": {
                 "rule": rule,
                 "service": traefik_service_name,
@@ -320,7 +372,7 @@ class TraefikRouteK8SCharm(CharmBase):
         return config
 
     @staticmethod
-    def _merge_traefik_configs(configs: Iterable[UnitConfig]) -> TraefikConfig:
+    def _merge_traefik_configs(configs: Iterable['UnitConfig']) -> 'TraefikConfig':
         traefik_config = {
             "http": {
                 "routers": {
