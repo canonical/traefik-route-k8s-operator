@@ -300,12 +300,11 @@ class TraefikRouteK8SCharm(CharmBase):
             unit_config = self._generate_traefik_unit_config(config_data)
             unit_configs.append(unit_config)
 
-            # FIXME:
-            #  we can publish the url to the unit immediately, but this might race
-            #  with traefik loading the config. Point is, we don't need Traefik to
-            #  tell us the url, but Traefik needs the config before it can start routing.
-            #  Consider whether we should only forward the url to the unit after Traefik
-            #  gives us some kind of ok.
+            # we can publish the url to the unit immediately, but this might race
+            # with traefik loading the config. Point is, we don't need Traefik to
+            # tell us the url, but Traefik needs the config before it can start routing.
+            # To be reconsidered if this leads to too much outage or bugs downstream.
+            logger.info(f"publishing to {unit_data['name']}: {config_data.root_url}")
             ingress.publish_url(relation, unit_data["name"], config_data.root_url)
 
         # merge configs?

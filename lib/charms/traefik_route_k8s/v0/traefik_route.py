@@ -43,14 +43,12 @@ class SomeCharm(CharmBase):
     )
 ```
 """
-import json
 import logging
-from typing import Optional, Dict
 
 import yaml
-from ops.charm import CharmBase, RelationEvent, RelationRole, CharmEvents
+from ops.charm import CharmBase, RelationEvent, CharmEvents
 from ops.framework import EventSource, Object
-from ops.model import Relation, Unit
+from ops.model import Relation
 
 # The unique Charmhub library identifier, never change it
 LIBID = ""
@@ -63,14 +61,6 @@ LIBAPI = 0
 LIBPATCH = 0
 
 log = logging.getLogger(__name__)
-
-
-def _deserialize_data(data):
-    return json.loads(data)
-
-
-def _serialize_data(data):
-    return
 
 
 class TraefikRouteException(RuntimeError):
@@ -123,7 +113,7 @@ class TraefikRouteProvider(Object):
         self.framework.observe(self.charm.on[relation_name].relation_changed,
                                self._on_relation_changed)
 
-    def _on_relation_changed(self, event:RelationEvent):
+    def _on_relation_changed(self, event: RelationEvent):
         if self.is_ready(event.relation):
             # todo check data is valid here?
             self.on.ready.emit(event.relation)
@@ -158,7 +148,8 @@ class TraefikRouteRequirer(Object):
     """
     on = TraefikRouteRequirerEvents()
 
-    def __init__(self, charm: CharmBase, relation: Relation, relation_name: str = 'traefik-route'):
+    def __init__(self, charm: CharmBase, relation: Relation,
+                 relation_name: str = 'traefik-route'):
         super(TraefikRouteRequirer, self).__init__(charm, relation_name)
         self._charm = charm
         self._relation = relation
@@ -177,5 +168,6 @@ class TraefikRouteRequirer(Object):
             raise UnauthorizedError()
 
         app_databag = self._relation.data[self._charm.app]
-        # indent for readability on debugging tools
-        app_databag['config'] = json.dumps(config, indent=2)
+
+        # Traefik thrives on yaml, feels pointless to talk json to Route
+        app_databag['config'] = yaml.safe_dump(config)
