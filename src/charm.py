@@ -129,8 +129,6 @@ class TraefikRouteK8SCharm(CharmBase):
         observe = self.framework.observe
         observe(self.on.config_changed, self._on_config_changed)
         observe(self.ingress_per_unit.on.ready, self._on_ingress_ready)
-        observe(self.on[self._traefik_route_relation_name].relation_changed,
-                self._on_route_ready)
 
         # todo wipe all data if and when TR 'stops' being ready
         #  (e.g. config change breaks the config)
@@ -265,43 +263,6 @@ class TraefikRouteK8SCharm(CharmBase):
         )
         self._update()
         self.unit.status = ActiveStatus()
-
-    def _on_route_ready(self, event: TraefikRouteProviderReadyEvent):
-        """The route provider (aka Traefik) is ready to provide ingress."""
-        if not self._is_ready:
-            return event.defer()
-
-        logger.info(
-            "TraefikRouteProviderReadyEvent received. IPU ready; TR ready; Relaying..."
-        )
-        self._publish_ingress()
-        self.unit.status = ActiveStatus()
-
-    def _publish_ingress(self):
-        """Publish ingress data to the routed application."""
-        ingress_data = self.traefik_route.ingress
-        if not ingress_data:
-            logger.info('traefik has not provided any ingress yet')
-            return
-
-        # todo validate input data here
-        logger.info('publishing ingress...')
-
-        # we add to the ingress data the urls we already know.
-        for unit in self._remote_routed_units:
-            if not self.ingress_per_unit.is_unit_ready(self._ipu_relation, unit):
-                # ipu not ready yet
-                logger.info(f"{unit} ipu not ready yet")
-                continue
-            unit_data = self.ingress_per_unit.get_data(self._ipu_relation, unit)
-            unit_name = unit_data['name']
-            if not ingress_data.get(unit_name):
-                # route not ready yet
-                logger.info(f"{unit_name} route not ready yet")
-                continue
-
-            config = self._config_for_unit(unit_data)
-            self.ingress_per_unit.publish_url(self._ipu_relation, unit_name, config.root_url)
 
     def _config_for_unit(self, unit_data: RequirerData) -> RouteConfig:
         """Get the _RouteConfig for the provided `unit_data`."""

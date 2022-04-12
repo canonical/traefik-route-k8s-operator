@@ -87,36 +87,16 @@ class TraefikRouteProviderReadyEvent(RelationEvent):
 
 class TraefikRouteRequirerReadyEvent(RelationEvent):
     """Event emitted when a unit requesting ingress has provided all data Traefik needs."""
-    # def __init__(self, handle, relation, ingress, app=None, unit=None):
-    #     super().__init__(handle, relation, app=app, unit=unit)
-    #     self.ingress = ingress
-    #
-    # def snapshot(self) -> dict:
-    #     """Used by the framework to serialize the event to disk.
-    #
-    #     Not meant to be called by charm code.
-    #     """
-    #     snap = super().snapshot()
-    #     snap['ingress'] = self.ingress
-    #     return snap
-    #
-    # def restore(self, snapshot: dict) -> None:
-    #     """Used by the framework to deserialize the event from disk.
-    #
-    #     Not meant to be called by charm code.
-    #     """
-    #     self.ingress = snapshot.pop('ingress')
-    #     super().restore(snapshot)
-
-
-class TraefikRouteProviderEvents(CharmEvents):
-    """Container for TraefikRouteProvider events."""
-    # ready = EventSource(TraefikRouteProviderReadyEvent)
 
 
 class TraefikRouteRequirerEvents(CharmEvents):
     """Container for TraefikRouteRequirer events."""
     ready = EventSource(TraefikRouteRequirerReadyEvent)
+
+
+class TraefikRouteProviderEvents(CharmEvents):
+    """Container for TraefikRouteProvider events."""
+    ready = EventSource(TraefikRouteProviderReadyEvent)
 
 
 class TraefikRouteProvider(Object):
@@ -128,7 +108,7 @@ class TraefikRouteProvider(Object):
     apply it, and update its own app databag to let Route know that the ingress
     is there.
     """
-    # on = TraefikRouteProviderEvents()
+    on = TraefikRouteProviderEvents()
 
     def __init__(self, charm: CharmBase, relation_name: str = 'traefik-route'):
         """Constructor for TraefikRouteProvider.
@@ -140,6 +120,13 @@ class TraefikRouteProvider(Object):
         """
         super().__init__(charm, relation_name)
         self.charm = charm
+        self.framework.observe(self.charm.on[relation_name].relation_changed,
+                               self._on_relation_changed)
+
+    def _on_relation_changed(self, event:RelationEvent):
+        if self.is_ready(event.relation):
+            # todo check data is valid here?
+            self.on.ready.emit(event.relation)
 
     @staticmethod
     def is_ready(relation: Relation):
@@ -151,34 +138,6 @@ class TraefikRouteProvider(Object):
         """Retrieve the config published by the remote application."""
         # todo validate this config
         return relation.data[relation.app]['config']
-
-    def publish_ingress(self, relation: Relation):
-        """Publish ingress to Traefik Route."""
-        remote_units = (unit for unit in relation.units if unit is not self.charm.unit)
-
-        # FIXME: where to fetch unit name for CMR case?
-        #  should TR publish a list of unit names?
-        ingress_data = {"ingress": {unit.name: {} for unit in remote_units}}
-        relation.data[self.charm.app]['ingress'] = ingress_data
-
-    def wipe_ingress_data(self, relation: Relation):
-        """Remove all ingress data."""
-        relation.data[self.charm.app]['ingress'] = ''
-
-    #     self.framework.observe(self.on[relation_name].relation_changed,
-    #                            self._check_ready)
-    #
-    # def _is_unit_ready(self, unit: Unit):
-    #
-    #     return True
-    #
-    # def _check_ready(self, event):
-    #     if self._is_unit_ready(self.charm.unit):
-    #         self.on.ready.emit(event.relation)
-
-
-class TraefikNotReadyError(TraefikRouteException):
-    """Raised when TraefikRouteRequirer is asked for a rule which """
 
 
 class TraefikRouteRequirer(Object):
@@ -220,12 +179,3 @@ class TraefikRouteRequirer(Object):
         app_databag = self._relation.data[self._charm.app]
         # indent for readability on debugging tools
         app_databag['config'] = json.dumps(config, indent=2)
-
-    @property
-    def ingress(self) -> Optional[dict]:
-        """Retrieve ingress from Traefik."""
-        remote_app_data = self._relation.data[self._relation.app]
-        ingress = remote_app_data.get('ingress')
-        if ingress:
-            return json.loads(ingress)
-        return None

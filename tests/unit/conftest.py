@@ -43,7 +43,7 @@ def harness() -> Harness[TraefikRouteK8SCharm]:
 def mock_ipu_relation(harness: Harness):
     # mock ipu relation
     ipu_relation_id = harness.add_relation(
-        TraefikRouteK8SCharm._ingress_endpoint, REMOTE_APP_NAME
+        TraefikRouteK8SCharm._ingress_relation_name, REMOTE_APP_NAME
     )
     harness.add_relation_unit(ipu_relation_id, REMOTE_UNIT_NAME)
     return ipu_relation_id
@@ -52,7 +52,7 @@ def mock_ipu_relation(harness: Harness):
 def mock_route_relation(harness):
     # mock traefik_route relation
     route_relation_id = harness.add_relation(
-        TraefikRouteK8SCharm._traefik_route_endpoint, TRAEFIK_APP_NAME
+        TraefikRouteK8SCharm._traefik_route_relation_name, TRAEFIK_APP_NAME
     )
     harness.add_relation_unit(route_relation_id, TRAEFIK_UNIT_NAME)
     return route_relation_id

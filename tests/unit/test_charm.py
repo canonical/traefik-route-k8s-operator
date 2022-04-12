@@ -155,29 +155,3 @@ def test_ingress_request_forwarding_data(
     assert json.loads(
         route_data[charm.app]["config"]) == EXPECTED_TRAEFIK_CONFIG
 
-
-def test_ingress_response_flow(harness: Harness[TraefikRouteK8SCharm]):
-    """Test that if traefik provides ingress, the route charm will correctly
-    forward it to the charm requesting ingress.
-    """
-    ipu_relation_id, route_relation_id = mock_happy_path(harness)
-    charm = harness.charm
-
-    # remote app requesting ingress: publish ingress data
-    harness.update_relation_data(
-        ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA_ENCODED)
-
-    original_on_route_ready = charm._on_route_ready
-    charm._on_route_ready = Mock(return_value=None)
-    # traefik app responds by publishing ingress;
-    # i.e. an URL for the unit requesting it
-    harness.update_relation_data(
-        route_relation_id, TRAEFIK_APP_NAME, SAMPLE_TRAEFIK_DATA_ENCODED)
-
-    assert charm.ingress_per_unit.is_ready(charm._ipu_relation)
-    # intercept
-    assert charm._on_route_ready.called
-    # and propagate
-    original_on_route_ready(charm._on_route_ready.call_args.args[0])
-
-    assert charm.ingress_per_unit.proxied_endpoints == {'remote/0': {'url': 'http://foo.bar/model-remote-0'}}
