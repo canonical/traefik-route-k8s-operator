@@ -18,7 +18,7 @@ traefik-k8s and the proxied application.
 
 ## Usage
 
-The idea is that this charm sits between the charm in need of ingress, and 
+The idea is that this charm sits between the charm in need of ingress (let's call it Charm), and 
 traefik-k8s.  For example a juju topology for providing ingress to a 
 prometheus-k8s charm could look like:
 
@@ -43,16 +43,16 @@ sequenceDiagram
     traefik-route --> charm: ingress_per_unit
     note left of charm: user relates charm and traefik-route
     traefik-route --> charm: version negotiation
+    note left of traefik-route: user configures traefik-route (config template and root_url)
 
     charm ->> traefik-route: (model & unit name)
-    traefik-route ->>  traefik: (model & unit name) + config
-    traefik ->> traefik-route: ingress
-    traefik-route ->> charm: ingress            
+    note left of traefik-route: traefik-route renders the config
+    traefik-route ->>  traefik: (rendered) config yaml
+    traefik-route ->>  charm: ingress (root_url) 
 ```
 
 ### Configuration fields:
-At the moment the only configuration option available to traefik-route-k8s is 
-the `rule` field: 
+You can configure TraefikRoute with the following parameters:
 
 * `rule`: contains a Jinja 2 template that is used to populate the Traefik router’s 
   rule field. it allows the cloud admin to override the template that 
@@ -70,7 +70,7 @@ the `rule` field:
     future we plan to support also application-level routing); to avoid 
     issues when used together with the Host directive or similar, 
     the slash character between application name and unit index is replaced with a dash.
-
+~~~
 For example, the rule value:
 
 	rule=Host(\"foo.bar/{{juju_unit}}\")
@@ -94,6 +94,38 @@ http:
 ```
 The `<unit_ingress_address>` and `<unit_port>` tokens are provided by each unit of 
 the downstream proxied application over the ingress_per_unit relation interface.
+~~~
+
+* `root_url`:
+  The url to advertise to the unit in need of ingress.
+
+  The value of the field is going to be processed in exactly the same way as
+  the `rule` field. The assumption is that the url is going to match
+  the rule; however, we have no way to validate and/or enforce this condition;
+  so beware!
+  For example, given a downstream unit called `prometheus/0` in the `cos` model, the 
+  following configuration is valid:
+
+  rule="Host(`{{juju_unit}}.{{juju_model}}.foo.bar`)"
+  root_url="http://{{juju_unit}}.{{juju_model}}.foo.bar/baz"
+
+  while the following configuration is not:
+
+  rule="Host(`{{juju_model}}-{{juju_unit}}.foo.bar`) || 
+       HostRegexp(`{subdomain:[a-z]+}.foo.bar`) || 
+       Host(`doobadooba.com`)"
+  root_url="ka-ching.com"
+
+  The reason why this is not valid is that the url does not match the rule:
+  so the url advertised to the unit will not in fact be routed correctly by Traefik.
+  Note that Traefik will still work 'correctly', i.e. the application will be 
+  reachable at (for example) `http://doobadooba.com`.
+  Examples of 'good' root_url values for this case would be:
+
+	  root_url="{{juju_model}}-{{juju_unit}}.foo.bar/baz"
+	  root_url="baz.foo.bar" 
+	  root_url="doobadooba.com/choo" 
+
 
 ## Relations
 Provides an “ingress-per-unit” relation using the “ingress_per_unit” relation 
