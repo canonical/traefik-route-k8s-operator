@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-# Copyright 2022 pietro
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Charm the service.
-
-"""
+"""Charm the service."""
 
 import logging
-import typing
 from dataclasses import dataclass
 from itertools import starmap
 from typing import Iterable, Optional, Tuple
@@ -15,20 +12,25 @@ from urllib.parse import urlparse
 
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, RequirerData
 from charms.traefik_route_k8s.v0.traefik_route import (
-    TraefikRouteProviderReadyEvent, TraefikRouteRequirerReadyEvent,
     TraefikRouteRequirer,
+    TraefikRouteRequirerReadyEvent,
 )
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
 
 # if typing.TYPE_CHECKING:
-from types_ import UnitConfig, TraefikConfig
+from types_ import TraefikConfig, UnitConfig
 
 logger = logging.getLogger(__name__)
 
 
 class RuleDerivationError(RuntimeError):
+    """Raised when a rule cannot be derived from other config parameters.
+
+    Solution: provide the rule manually, or fix what's broken.
+    """
+
     def __init__(self, url, *args):
         msg = f"Unable to derive Rule from {url}; ensure that the url is valid."
         super(RuleDerivationError, self).__init__(msg, *args)
@@ -36,6 +38,8 @@ class RuleDerivationError(RuntimeError):
 
 @dataclass
 class RouteConfig:
+    """Route configuration."""
+
     root_url: str
     rule: str
     id_: str
@@ -59,8 +63,7 @@ class _RouteConfig:
 
             elif obj != (stripped := obj.strip()):
                 error = (
-                    f"{name} {obj!r} starts or ends with whitespace;"
-                    f"it should be {stripped!r}."
+                    f"{name} {obj!r} starts or ends with whitespace;" f"it should be {stripped!r}."
                 )
 
             if error:
@@ -77,7 +80,6 @@ class _RouteConfig:
 
     def render(self, model_name: str, unit_name: str, app_name: str):
         """Fills in the blanks in the templates."""
-
         # todo make proper jinja2 thing here
         def _render(obj: str):
             for key, value in (
@@ -171,20 +173,17 @@ class TraefikRouteK8SCharm(CharmBase):
     def _remote_traefik_unit(self) -> Optional[Unit]:
         """The traefik unit providing ingress.
 
-        We're going to assume there's only one."""
-        traefik_units = self._get_remote_units_from_relation(
-            self._traefik_route_relation
-        )
+        We're going to assume there's only one.
+        """
+        traefik_units = self._get_remote_units_from_relation(self._traefik_route_relation)
         if not traefik_units:
             return None
-        assert len(traefik_units) == 1, 'There should be exactly 1 remote Traefik unit.'
+        assert len(traefik_units) == 1, "There should be exactly 1 remote Traefik unit."
         return traefik_units[0]
 
     @property
     def _config(self) -> _RouteConfig:
-        return _RouteConfig(
-            rule=self.config.get("rule"), root_url=self.config.get("root_url")
-        )
+        return _RouteConfig(rule=self.config.get("rule"), root_url=self.config.get("root_url"))
 
     @property
     def rule(self) -> Optional[str]:
@@ -197,9 +196,7 @@ class TraefikRouteK8SCharm(CharmBase):
         return self._config.root_url
 
     def _render_config(self, model_name: str, unit_name: str, app_name: str):
-        return self._config.render(
-            model_name=model_name, unit_name=unit_name, app_name=app_name
-        )
+        return self._config.render(model_name=model_name, unit_name=unit_name, app_name=app_name)
 
     def _on_config_changed(self, _):
         """Check the config; set an active status if all is good."""
@@ -228,24 +225,19 @@ class TraefikRouteK8SCharm(CharmBase):
         # validate IPU relation status
         ipu_relation = self._ipu_relation
         if not ipu_relation:
-            self.unit.status = BlockedStatus(
-                f"Awaiting to be related via ingress-per-unit."
-            )
+            self.unit.status = BlockedStatus("Awaiting to be related via ingress-per-unit.")
             return False
         elif self.ingress_per_unit.is_failed(ipu_relation):
-            self.unit.status = BlockedStatus(
-                f"ingress-per-unit relation is broken (failed)."
-            )
+            self.unit.status = BlockedStatus("ingress-per-unit relation is broken (failed).")
             return False
         elif not self.ingress_per_unit.is_available(ipu_relation):
-            self.unit.status = WaitingStatus(f"ingress-per-unit is not available yet.")
+            self.unit.status = WaitingStatus("ingress-per-unit is not available yet.")
             return False
 
         # validate traefik-route relation status
         if not self._traefik_route_relation:
             self.unit.status = WaitingStatus(
-                f"traefik-route is not available yet. "
-                f"Relate traefik-route to traefik."
+                "traefik-route is not available yet. Relate traefik-route to traefik."
             )
             return False
 
@@ -254,14 +246,12 @@ class TraefikRouteK8SCharm(CharmBase):
     def _on_ingress_ready(self, event: TraefikRouteRequirerReadyEvent):
         """The route requirer (aka this charm) is ready.
 
-         That is, it can forward to Traefik the config Traefik will need to provide ingress.
-         """
+        That is, it can forward to Traefik the config Traefik will need to provide ingress.
+        """
         if not self._is_ready:
             return event.defer()
 
-        logger.info(
-            "TraefikRouteRequirerReadyEvent received. IPU ready; TR ready; Relaying..."
-        )
+        logger.info("TraefikRouteRequirerReadyEvent received. IPU ready; TR ready; Relaying...")
         self._update()
         self.unit.status = ActiveStatus()
 
@@ -274,7 +264,7 @@ class TraefikRouteK8SCharm(CharmBase):
         model_name = unit_data["model"]
 
         # sanity checks
-        assert unit_name is not None, f"remote unit did not provide its name"
+        assert unit_name is not None, "remote unit did not provide its name"
         assert "/" in unit_name, unit_name
 
         return self._render_config(
@@ -288,13 +278,10 @@ class TraefikRouteK8SCharm(CharmBase):
         # we assume that self._is_ready().
 
         ingress: IngressPerUnitProvider = self.ingress_per_unit
-        traefik_unit: Unit = self._remote_traefik_unit
         relation = self._ipu_relation
 
         unit_configs = []
-        ready_units = filter(
-            lambda unit_: ingress.is_unit_ready(relation, unit_), relation.units
-        )
+        ready_units = filter(lambda unit_: ingress.is_unit_ready(relation, unit_), relation.units)
         for unit in ready_units:  # units requesting ingress
             unit_data = ingress.get_data(self._ipu_relation, unit)
             config_data = self._config_for_unit(unit_data)
@@ -314,13 +301,13 @@ class TraefikRouteK8SCharm(CharmBase):
             self.traefik_route.submit_to_traefik(config=config)
 
     @staticmethod
-    def _generate_traefik_unit_config(config: RouteConfig) -> 'UnitConfig':
+    def _generate_traefik_unit_config(config: RouteConfig) -> "UnitConfig":
         rule, config_id, url = config.rule, config.id_, config.root_url
 
         traefik_router_name = f"juju-{config_id}-router"
         traefik_service_name = f"juju-{config_id}-service"
 
-        config: 'UnitConfig' = {
+        config: "UnitConfig" = {
             "router": {
                 "rule": rule,
                 "service": traefik_service_name,
@@ -333,15 +320,11 @@ class TraefikRouteK8SCharm(CharmBase):
         return config
 
     @staticmethod
-    def _merge_traefik_configs(configs: Iterable['UnitConfig']) -> 'TraefikConfig':
+    def _merge_traefik_configs(configs: Iterable["UnitConfig"]) -> "TraefikConfig":
         traefik_config = {
             "http": {
-                "routers": {
-                    config["router_name"]: config["router"] for config in configs
-                },
-                "services": {
-                    config["service_name"]: config["service"] for config in configs
-                },
+                "routers": {config["router_name"]: config["router"] for config in configs},
+                "services": {config["service_name"]: config["service"] for config in configs},
             }
         }
         return traefik_config

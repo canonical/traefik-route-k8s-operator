@@ -1,11 +1,9 @@
-# Copyright 2022 pietro
+#!/usr/bin/env python3
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
-from functools import cached_property
-from inspect import getmembers
 
 import pytest as pytest
-import yaml
 from ops.testing import Harness
 
 from charm import TraefikRouteK8SCharm

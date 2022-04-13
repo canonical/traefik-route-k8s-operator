@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+"""Types for TraefikRoute charm."""
+
 from typing import List, Mapping
 
 try:
@@ -8,35 +14,39 @@ except ModuleNotFoundError:
 RouterName = ServiceName = str
 
 
-class Router(TypedDict):
+# D101 'missing docstrings in public class'
+# N815 'no camelCase'
+
+
+class Router(TypedDict):  # noqa: D101
     rule: str
     service: str
-    entryPoints: List[str]
+    entryPoints: List[str]  # noqa N815
 
 
-class Url(TypedDict):
+class Url(TypedDict):  # noqa: D101
     url: str
 
 
-class Servers(TypedDict):
+class Servers(TypedDict):  # noqa: D101
     servers: List[Url]
 
 
-class Service(TypedDict):
-    loadBalancer: Servers
+class Service(TypedDict):  # noqa: D101
+    loadBalancer: Servers  # noqa N815
 
 
-class UnitConfig(TypedDict):
+class UnitConfig(TypedDict):  # noqa: D101
     router_name: str
     router: Router
     service_name: str
     service: Service
 
 
-class Http(TypedDict):
+class Http(TypedDict):  # noqa: D101
     routers: Mapping[RouterName, Router]
     services: Mapping[ServiceName, Router]
 
 
-class TraefikConfig(TypedDict):
+class TraefikConfig(TypedDict):  # noqa: D101
     http: Http
