@@ -65,8 +65,4 @@ options:
         root_url="baz.foo.bar" 
         root_url="doobadooba.com/choo" 
       
-      If the root_url begins with `/`, we will fill in the host and port for you:
-        root_url="/baz/" 
-      will become: `http://{external-hostname | loadbalancer ip}:{port}/baz/`
-
     type: string

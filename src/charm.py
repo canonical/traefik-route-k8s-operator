@@ -116,15 +116,16 @@ class TraefikRouteK8SCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+        if not self.unit.is_leader():
+            self.unit.status = BlockedStatus("Traefik-Route cannot be scaled > n1.")
+            logger.error(f"{self} was initialized without leadership.")
+            # skip initializing the listeners: charm will be dead unreactive
+            return
+
         self.ingress_per_unit = IngressPerUnitProvider(self, self._ingress_relation_name)
         self.traefik_route = TraefikRouteRequirer(
             self, self._traefik_route_relation, self._traefik_route_relation_name
         )
-
-        if not self.unit.is_leader():
-            self.unit.status = BlockedStatus("Traefik-Route cannot be scaled > n1.")
-            # skip initializing the listeners: charm will be dead unreactive
-            return
 
         observe = self.framework.observe
         observe(self.on.config_changed, self._on_config_changed)

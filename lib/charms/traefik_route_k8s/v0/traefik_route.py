@@ -4,8 +4,9 @@
 r"""# Interface Library for traefik_route.
 
 This library wraps relation endpoints for traefik_route. The requirer of this
-relation is a charm in need of ingress (or a proxy thereof), the
-provider is the traefik-k8s charm.
+relation is the traefik-route-k8s charm, or any charm capable of providing
+Traefik configuration files. The provider is the traefik-k8s charm, or another
+charm willing to consume Traefik configuration files.
 
 ## Getting Started
 
@@ -16,6 +17,8 @@ cd some-charm
 charmcraft fetch-lib charms.traefik_route_k8s.v0.traefik_route
 ```
 
+To use the library from the provider side (Traefik):
+
 ```yaml
 requires:
     traefik_route:
@@ -23,27 +26,53 @@ requires:
         limit: 1
 ```
 
-Then, to initialise the library:
+```python
+from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteProvider
+
+class TraefikCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    self.traefik_route = TraefikRouteProvider(self)
+
+    self.framework.observe(
+        self.traefik_route.on.ready, self._handle_traefik_route_ready
+    )
+
+    def _handle_traefik_route_ready(self, event):
+        config: str = self.traefik_route.get_config(event.relation)  # yaml
+        # use config to configure Traefik
+```
+
+To use the library from the requirer side (TraefikRoute):
+
+```yaml
+requires:
+    traefik-route:
+        interface: traefik_route
+        limit: 1
+        optional: false
+```
 
 ```python
 # ...
 from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
 
-class SomeCharm(CharmBase):
+class TraefikRouteCharm(CharmBase):
   def __init__(self, *args):
     # ...
-    self.ingress_per_unit = TraefikRouteProvider(self)
-    self.traefik_route = TraefikRouteRequirer(self)
+    traefik_route = TraefikRouteRequirer(
+        self, self.model.relations.get("traefik-route"),
+        "traefik-route"
+    )
+    if traefik_route.is_ready():
+        traefik_route.submit_to_traefik(
+            config={'my': {'traefik': 'configuration'}}
+        )
 
-    self.framework.observe(
-        self.ingress_per_unit.on.request, self.traefik_route.relay
-    )
-    self.framework.observe(
-        self.traefik_route.on.response, self.ingress_per_unit.respond
-    )
 ```
 """
 import logging
+from typing import Optional
 
 import yaml
 from ops.charm import CharmBase, RelationEvent, CharmEvents
@@ -97,6 +126,7 @@ class TraefikRouteProvider(Object):
     receiving it, will fetch the config from the TraefikRoute's application databag,
     apply it, and update its own app databag to let Route know that the ingress
     is there.
+    The TraefikRouteProvider provides api to do this easily.
     """
     on = TraefikRouteProviderEvents()
 
@@ -119,32 +149,29 @@ class TraefikRouteProvider(Object):
             self.on.ready.emit(event.relation)
 
     @staticmethod
-    def is_ready(relation: Relation):
+    def is_ready(relation: Relation) -> bool:
         """Whether TraefikRoute is ready on this relation: i.e. the remote app shared the config."""
         return 'config' in relation.data[relation.app]
 
     @staticmethod
-    def get_config(relation: Relation):
+    def get_config(relation: Relation) -> Optional[str]:
         """Retrieve the config published by the remote application."""
         # todo validate this config
-        return relation.data[relation.app]['config']
+        return relation.data[relation.app].get('config')
 
 
 class TraefikRouteRequirer(Object):
     """Wrapper for the requirer side of traefik-route.
 
-    traefik_route will publish to the application databag an object like:
+    The traefik_route requirer will publish to the application databag an object like:
     {
         'config': <Traefik_config>
     }
 
-    'ingress' is provided by the ingress end-user via ingress_per_unit,
-    'config' is provided by the cloud admin via the traefik-route-k8s charm.
-
-    TraefikRouteRequirer does no validation; it assumes that ingress_per_unit
-    validates its part of the data, and that the traefik-route-k8s charm will
-    do its part by validating the config before this provider is invoked to
-    share it with traefik.
+    NB: TraefikRouteRequirer does no validation; it assumes that the
+    traefik-route-k8s charm will provide valid yaml-encoded config.
+    The TraefikRouteRequirer provides api to store this config in the
+    application databag.
     """
     on = TraefikRouteRequirerEvents()
 
@@ -154,7 +181,7 @@ class TraefikRouteRequirer(Object):
         self._charm = charm
         self._relation = relation
 
-    def is_ready(self):
+    def is_ready(self) -> bool:
         """Is the TraefikRouteRequirer ready to submit data to Traefik?"""
         return self._relation is not None
 

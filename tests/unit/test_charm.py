@@ -3,6 +3,7 @@
 import json
 from unittest.mock import Mock
 
+import yaml
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 
@@ -152,6 +153,6 @@ def test_ingress_request_forwarding_data(
     )
     route_data = charm.traefik_route._relation.data
     assert route_data.get(charm.unit) == {}
-    assert json.loads(
+    assert yaml.safe_load(
         route_data[charm.app]["config"]) == EXPECTED_TRAEFIK_CONFIG
 
