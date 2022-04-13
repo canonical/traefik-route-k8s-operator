@@ -70,31 +70,33 @@ You can configure TraefikRoute with the following parameters:
     future we plan to support also application-level routing); to avoid 
     issues when used together with the Host directive or similar, 
     the slash character between application name and unit index is replaced with a dash.
-~~~
-For example, the rule value:
 
-	rule=Host(\"foo.bar/{{juju_unit}}\")
+    For example, the rule value:
 
-will generate the following Traefik configuration file when related via the 
-ingress_per_unit relation interface with a Juju application called `prometheustest` 
-from the `costest` model with two units:
+    ```
+    rule=Host(`foo.bar/{{juju_unit}}`)
+    ```
 
-```yaml
-http:
-   routers:
-     juju-costest-prometheustest-0-router:
-       rule: Host(\"foo.bar/prometheustest-0\")
-       service: juju-costest-prometheustest-0
-       entrypoint: web
-   services:
-     juju-costest-prometheustest-0-service:
-       loadBalancer:
-         servers:
-           - url: http://<unit_ingress_address>:<unit_port>
-```
-The `<unit_ingress_address>` and `<unit_port>` tokens are provided by each unit of 
-the downstream proxied application over the ingress_per_unit relation interface.
-~~~
+    will generate the following Traefik configuration file when related via the 
+    ingress_per_unit relation interface with a Juju application called `prometheustest` 
+    from the `costest` model with two units:
+
+    ```yaml
+    http:
+        routers:
+            juju-costest-prometheustest-0-router:
+                rule: Host(`foo.bar/prometheustest-0`)
+                service: juju-costest-prometheustest-0
+                entrypoint: web
+        services:
+            juju-costest-prometheustest-0-service:
+                loadBalancer:
+                    servers:
+                    - url: http://<unit_ingress_address>:<unit_port>
+    ```
+
+    The `<unit_ingress_address>` and `<unit_port>` tokens are provided by each unit of 
+    the downstream proxied application over the ingress_per_unit relation interface.
 
 * `root_url`:
   The url to advertise to the unit in need of ingress.
@@ -106,15 +108,19 @@ the downstream proxied application over the ingress_per_unit relation interface.
   For example, given a downstream unit called `prometheus/0` in the `cos` model, the 
   following configuration is valid:
 
+  ```
   rule="Host(`{{juju_unit}}.{{juju_model}}.foo.bar`)"
   root_url="http://{{juju_unit}}.{{juju_model}}.foo.bar/baz"
+  ```
 
   while the following configuration is not:
 
+  ```
   rule="Host(`{{juju_model}}-{{juju_unit}}.foo.bar`) || 
        HostRegexp(`{subdomain:[a-z]+}.foo.bar`) || 
        Host(`doobadooba.com`)"
   root_url="ka-ching.com"
+  ```
 
   The reason why this is not valid is that the url does not match the rule:
   so the url advertised to the unit will not in fact be routed correctly by Traefik.
@@ -122,10 +128,11 @@ the downstream proxied application over the ingress_per_unit relation interface.
   reachable at (for example) `http://doobadooba.com`.
   Examples of 'good' root_url values for this case would be:
 
-	  root_url="{{juju_model}}-{{juju_unit}}.foo.bar/baz"
-	  root_url="baz.foo.bar" 
-	  root_url="doobadooba.com/choo" 
-
+  ```
+  root_url="{{juju_model}}-{{juju_unit}}.foo.bar/baz"
+  root_url="baz.foo.bar" 
+  root_url="doobadooba.com/choo" 
+  ```
 
 ## Relations
 Provides an “ingress-per-unit” relation using the “ingress_per_unit” relation 
