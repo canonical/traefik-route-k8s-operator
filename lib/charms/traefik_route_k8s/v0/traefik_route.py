@@ -80,14 +80,14 @@ from ops.framework import EventSource, Object
 from ops.model import Relation
 
 # The unique Charmhub library identifier, never change it
-LIBID = ""
+LIBID = "fe2ac43a373949f2bf61383b9f35c83c"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 0
+LIBPATCH = 1
 
 log = logging.getLogger(__name__)
 
