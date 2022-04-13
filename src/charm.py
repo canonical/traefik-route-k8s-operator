@@ -236,7 +236,7 @@ class TraefikRouteK8SCharm(CharmBase):
 
         # validate traefik-route relation status
         if not self._traefik_route_relation:
-            self.unit.status = WaitingStatus(
+            self.unit.status = BlockedStatus(
                 "traefik-route is not available yet. Relate traefik-route to traefik."
             )
             return False

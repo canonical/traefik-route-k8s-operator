@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import contextlib
 import logging
-import urllib.request
 from pathlib import Path
 
 import pytest
@@ -22,13 +21,12 @@ async def wait_for(ops_test, status):
         status=status,
         timeout=1000,
     )
-    assert ops_test.model.applications[APP_NAME].units[
-               0].workload_status == status
+    assert ops_test.model.applications[APP_NAME].units[0].workload_status == status
 
 
 @contextlib.asynccontextmanager
-async def fast_forward(ops_test, interval: str = '10s'):
-    # speed up update-status firing
+async def fast_forward(ops_test, interval: str = "10s"):
+    # temporarily speed up update-status firing rate
     await ops_test.model.set_config({"update-status-hook-interval": interval})
     yield
     await ops_test.model.set_config({"update-status-hook-interval": "60m"})
@@ -43,27 +41,34 @@ async def test_build_and_deploy(ops_test: OpsTest):
 async def test_unit_blocked_on_deploy(ops_test: OpsTest):
     async with fast_forward(ops_test):
         # Route will go to blocked until configured
-        await wait_for(ops_test, 'blocked')
+        await wait_for(ops_test, "blocked")
 
 
-async def test_unit_active_after_config(ops_test: OpsTest):
+async def test_unit_blocked_after_config(ops_test: OpsTest):
     # configure
+    unit_name = APP_NAME + "/0"
     root_url = "http://foo.bar{{juju_unit}}/"
-    await ops_test.juju(*f"config {APP_NAME}/0 root_url={root_url}".split(" "))
+    await ops_test.juju("config", unit_name, "root_url=" + root_url)
+
+    # now we're blocked still
+    async with fast_forward(ops_test):
+        await wait_for(ops_test, "blocked")
+
+
+async def test_unit_related_active(ops_test: OpsTest):
+    # configure
+    unit_name = APP_NAME + "/0"
+    root_url = "http://foo.bar{{juju_unit}}/"
+    await ops_test.juju("config", unit_name, "root_url=" + root_url)
+
+    # todo: should we be pinning some versions to test with,
+    #  or develop our own tester charms?
+    await ops_test.juju("deploy", "prometheus-k8s", "--channel", "edge")
+    await ops_test.juju("deploy", "traefik-k8s", "--channel", "edge")
+
+    await ops_test.juju("relate", "prometheus-k8s", APP_NAME)
+    await ops_test.juju("relate", "traefik-k8s", APP_NAME)
 
     # now we'll get to active
     async with fast_forward(ops_test):
-        await wait_for(ops_test, 'active')
-
-
-@pytest.mark.abort_on_fail
-async def test_application_is_up(ops_test: OpsTest):
-    status = await ops_test.model.get_status()  # noqa: F821
-    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"][
-        "address"]
-
-    url = f"http://{address}"
-
-    logger.info("querying app address: %s", url)
-    response = urllib.request.urlopen(url, data=None, timeout=2.0)
-    assert response.code == 200
+        await wait_for(ops_test, "blocked")
