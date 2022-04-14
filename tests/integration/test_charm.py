@@ -33,9 +33,8 @@ async def fast_forward(ops_test, interval: str = "10s"):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
-    charm = await ops_test.build_charm(".")
-    await ops_test.model.deploy(charm, application_name=APP_NAME)
+async def test_build_and_deploy(ops_test: OpsTest, traefik_route_charm):
+    await ops_test.model.deploy(traefik_route_charm, application_name=APP_NAME)
 
 
 async def test_unit_blocked_on_deploy(ops_test: OpsTest):
@@ -46,9 +45,8 @@ async def test_unit_blocked_on_deploy(ops_test: OpsTest):
 
 async def test_unit_blocked_after_config(ops_test: OpsTest):
     # configure
-    unit_name = APP_NAME + "/0"
     root_url = "http://foo.bar{{juju_unit}}/"
-    await ops_test.juju("config", unit_name, "root_url=" + root_url)
+    await ops_test.juju("config", APP_NAME, "root_url=" + root_url)
 
     # now we're blocked still
     async with fast_forward(ops_test):
@@ -57,18 +55,18 @@ async def test_unit_blocked_after_config(ops_test: OpsTest):
 
 async def test_unit_related_active(ops_test: OpsTest):
     # configure
-    unit_name = APP_NAME + "/0"
     root_url = "http://foo.bar{{juju_unit}}/"
-    await ops_test.juju("config", unit_name, "root_url=" + root_url)
+    await ops_test.juju("config", APP_NAME, "root_url=" + root_url)
 
     # todo: should we be pinning some versions to test with,
     #  or develop our own tester charms?
     await ops_test.juju("deploy", "prometheus-k8s", "--channel", "edge")
-    await ops_test.juju("deploy", "traefik-k8s", "--channel", "edge")
+    await ops_test.juju("deploy", "")
+    await ops_test.juju("config", "traefik-k8s", "external_hostname=foo.bar")
 
     await ops_test.juju("relate", "prometheus-k8s", APP_NAME)
     await ops_test.juju("relate", "traefik-k8s", APP_NAME)
 
     # now we'll get to active
     async with fast_forward(ops_test):
-        await wait_for(ops_test, "blocked")
+        await wait_for(ops_test, "active")

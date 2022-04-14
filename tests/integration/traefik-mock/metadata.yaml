@@ -1,0 +1,9 @@
+# Copyright 2022 pietro
+# See LICENSE file for licensing details.
+
+# For a complete list of supported options, see:
+# https://juju.is/docs/sdk/metadata-reference
+name: traefik-mock
+display-name: traefik-mock
+description: tester charm mocking traefik's interface
+summary: 42
