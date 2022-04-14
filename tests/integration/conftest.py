@@ -1,10 +1,13 @@
+#!/usr/bin/env python3
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import shutil
 from os import unlink
 
 import pytest
 import pytest_asyncio
 from pytest_operator.plugin import OpsTest
-
 
 TRAEFIK_MOCK_NAME = "traefik-mock"
 

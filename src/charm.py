@@ -252,7 +252,9 @@ class TraefikRouteK8SCharm(CharmBase):
         if not self._is_ready:
             return event.defer()
 
-        logger.info("TraefikRouteRequirerReadyEvent received. IPU ready; TR ready; Config OK; Relaying...")
+        logger.info(
+            "TraefikRouteRequirerReadyEvent received. IPU ready; TR ready; Config OK; Relaying..."
+        )
         self._update()
         self.unit.status = ActiveStatus()
 
