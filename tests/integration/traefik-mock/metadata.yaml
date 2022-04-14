@@ -6,7 +6,7 @@
 name: traefik-mock
 display-name: traefik-mock
 description: tester charm mocking traefik's interface
-summary: 42
+summary: forty-two
 
 provides:
     traefik-route:

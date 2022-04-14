@@ -21,9 +21,10 @@ class TraefikMockCharm(CharmBase):
         super().__init__(*args)
         traefik_route = TraefikRouteProvider(charm=self)
         model: Model = self.model
-        tr_relation = model.relations.get("traefik-route")
+        tr_relations = model.relations.get("traefik-route")
 
-        if tr_relation:
+        if tr_relations:
+            tr_relation = tr_relations[0]
             if traefik_route.is_ready(tr_relation):
                 config = traefik_route.get_config(tr_relation)
                 if config:

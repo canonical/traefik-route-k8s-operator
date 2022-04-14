@@ -2,17 +2,13 @@ import shutil
 from os import unlink
 
 import pytest
+import pytest_asyncio
 from pytest_operator.plugin import OpsTest
 
 
-@pytest.fixture(scope="session")
-def traefik_mock_name():
-    return "traefik-mock"
+TRAEFIK_MOCK_NAME = "traefik-mock"
 
-
-@pytest.fixture(scope="session")
-def ingress_requirer_mock_name():
-    return "ingress-requirer-mock"
+INGRESS_REQUIRER_MOCK_NAME = "ingress-requirer-mock"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -35,25 +31,19 @@ def copy_ingress_lib_to_tester_charm():
     unlink(install_path)
 
 
-# only pack charms once
-@pytest.fixture(scope="session")
-def session_scoped_ops_test(request, tmp_path_factory):
-    return OpsTest(request, tmp_path_factory)
+@pytest.mark.abort_on_fail
+@pytest_asyncio.fixture
+async def traefik_route_charm(ops_test: OpsTest):
+    return await ops_test.build_charm(".")
 
 
 @pytest.mark.abort_on_fail
-@pytest.fixture(scope="session")
-def traefik_route_charm(session_scoped_ops_test: OpsTest):
-    charm = await session_scoped_ops_test.build_charm(".")
+@pytest_asyncio.fixture
+async def traefik_mock_charm(ops_test: OpsTest):
+    return await ops_test.build_charm("./tests/integration/traefik-mock")
 
 
 @pytest.mark.abort_on_fail
-@pytest.fixture(scope="session")
-def traefik_mock_charm(session_scoped_ops_test: OpsTest):
-    charm = await session_scoped_ops_test.build_charm("./traefik-mock")
-
-
-@pytest.mark.abort_on_fail
-@pytest.fixture(scope="session")
-def ingress_requirer_mock_charm(session_scoped_ops_test: OpsTest):
-    charm = await session_scoped_ops_test.build_charm("./ingress-requirer-mock")
+@pytest_asyncio.fixture
+async def ingress_requirer_mock_charm(ops_test: OpsTest):
+    return await ops_test.build_charm("./tests/integration/ingress-requirer-mock")

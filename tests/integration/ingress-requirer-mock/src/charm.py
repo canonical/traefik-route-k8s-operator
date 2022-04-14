@@ -21,12 +21,14 @@ class TraefikMockCharm(CharmBase):
         super().__init__(*args)
         ingress = IngressPerUnitRequirer(charm=self)
         model: Model = self.model
-        ipu_relation = model.relations.get("ingress-per-unit")
+        ipu_relations = model.relations.get("ingress-per-unit")
 
-        if ipu_relation:
+        if ipu_relations:
+            ipu_relation = ipu_relations[0]
+            ingress.provide_ingress_requirements(host="0.0.0.0", port=80)
+
             if ingress.is_ready(ipu_relation):
-                ingress.provide_ingress_requirements(host="0.0.0.0", port=80)
-                self.unit.status = ActiveStatus("all good")
+                self.unit.status = ActiveStatus("all good!")
             else:
                 self.unit.status = WaitingStatus("ipu not ready yet")
         else:
