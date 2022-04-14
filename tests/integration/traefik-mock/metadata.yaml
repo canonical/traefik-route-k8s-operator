@@ -7,3 +7,9 @@ name: traefik-mock
 display-name: traefik-mock
 description: tester charm mocking traefik's interface
 summary: 42
+
+provides:
+    traefik-route:
+        interface: traefik_route
+        limit: 1
+        optional: false

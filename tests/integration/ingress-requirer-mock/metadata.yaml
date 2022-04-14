@@ -7,3 +7,9 @@ name: ingress-requirer-mock
 display-name: ingress-requirer-mock
 description: charm requesting ingress, for testing
 summary: 42
+
+requires:
+    ingress-per-unit:
+        interface: ingress_per_unit
+        limit: 1
+        optional: false
