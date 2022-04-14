@@ -81,9 +81,7 @@ async def test_unit_blocked_after_config(ops_test: OpsTest):
 
 
 async def test_relations(
-    ops_test: OpsTest,
-    traefik_mock_charm,
-    ingress_requirer_mock_charm,
+    ops_test: OpsTest
 ):
     # all is already deployed by now, so we should just be able to...
     await asyncio.gather(
