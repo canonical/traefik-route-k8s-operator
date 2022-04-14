@@ -19,6 +19,10 @@ class TraefikMockCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+        if not self.unit.is_leader():
+            self.unit.status = BlockedStatus("no leadership")
+            return
+
         traefik_route = TraefikRouteProvider(charm=self)
         model: Model = self.model
         tr_relations = model.relations.get("traefik-route")

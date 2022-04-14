@@ -248,10 +248,11 @@ class TraefikRouteK8SCharm(CharmBase):
 
         That is, it can forward to Traefik the config Traefik will need to provide ingress.
         """
+        # ingress may be ready, but am I too?
         if not self._is_ready:
             return event.defer()
 
-        logger.info("TraefikRouteRequirerReadyEvent received. IPU ready; TR ready; Relaying...")
+        logger.info("TraefikRouteRequirerReadyEvent received. IPU ready; TR ready; Config OK; Relaying...")
         self._update()
         self.unit.status = ActiveStatus()
 

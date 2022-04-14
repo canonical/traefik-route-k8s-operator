@@ -42,6 +42,7 @@ sequenceDiagram
 
     traefik-route --> charm: ingress_per_unit
     note left of charm: user relates charm and traefik-route
+    traefik-route --> charm: version negotiation
     note left of traefik-route: user configures traefik-route (config template and root_url)
 
     charm ->> traefik-route: (model & unit name)
