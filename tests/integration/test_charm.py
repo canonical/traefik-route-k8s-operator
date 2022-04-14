@@ -128,19 +128,20 @@ async def test_relation_data(ops_test: OpsTest):
         raise
 
     model_name = ops_test.model_name
-    url = MOCK_ROOT_URL_TEMPLATE.replace("{{juju_unit}}", INGRESS_REQUIRER_MOCK_NAME + "-0")
+    unit_name = INGRESS_REQUIRER_MOCK_NAME + "-0"
+    url = MOCK_ROOT_URL_TEMPLATE.replace("{{juju_unit}}", unit_name)
 
     expected_config = textwrap.dedent(
         f"""
     http:
       routers:
-        juju-{INGRESS_REQUIRER_MOCK_NAME}-0-{model_name}-router:
+        juju-{unit_name}-{model_name}-router:
           entryPoints:
           - web
-          rule: Host(`{INGRESS_REQUIRER_MOCK_NAME}.foo`)
-          service: juju-{INGRESS_REQUIRER_MOCK_NAME}-0-{model_name}-service
+          rule: Host(`{unit_name}.foo`)
+          service: juju-{unit_name}-{model_name}-service
       services:
-        juju-{INGRESS_REQUIRER_MOCK_NAME}-0-{model_name}-service:
+        juju-{unit_name}-{model_name}-service:
           loadBalancer:
             servers:
             - url: {url}
