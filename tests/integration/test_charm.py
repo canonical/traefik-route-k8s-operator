@@ -80,9 +80,7 @@ async def test_unit_blocked_after_config(ops_test: OpsTest):
     #  await ops_test.juju("config", APP_NAME, 'root_url=""')
 
 
-async def test_relations(
-    ops_test: OpsTest
-):
+async def test_relations(ops_test: OpsTest):
     # all is already deployed by now, so we should just be able to...
     await asyncio.gather(
         ops_test.model.add_relation(

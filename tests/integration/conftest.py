@@ -68,5 +68,4 @@ async def ops_test(request, tmp_path_factory):
     try:
         await ops_test._cleanup_models()
     except websockets.exceptions.ConnectionClosed:
-        print('ignored a websockets.exceptions.ConnectionClosed error')
-
+        print("ignored a websockets.exceptions.ConnectionClosed error")
