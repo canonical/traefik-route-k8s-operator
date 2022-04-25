@@ -5,7 +5,7 @@
 """Traefik configuration interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Iterable
 
 from route_config import RouteConfig
 
@@ -14,7 +14,7 @@ try:
 except ModuleNotFoundError:
     from typing_extensions import TypedDict
 
-RouterName = ServiceName = str
+RouterName = ServiceName = MiddlewareName = str
 
 
 # D101 'missing docstrings in public class'
@@ -45,13 +45,13 @@ class UnitConfig(TypedDict):  # noqa: D101
     router: Router
     service_name: str
     service: Service
-    middlewares: Dict[str, Any]
+    middlewares: Dict[str, Dict]
 
 
 class Http(TypedDict):  # noqa: D101
-    routers: Mapping[RouterName, Router]
-    services: Mapping[ServiceName, Router]
-
+    routers: Dict[RouterName, Router]
+    services: Dict[ServiceName, Router]
+    middlewares: Dict[MiddlewareName, Dict]
 
 class TraefikConfig(TypedDict):  # noqa: D101
     http: Http
@@ -107,3 +107,18 @@ def generate_unit_config(config: RouteConfig) -> "UnitConfig":
         "middlewares": {mw.name: mw.to_dict() for mw in middlewares},
     }
     return config
+
+
+def merge_configs(configs: Iterable["UnitConfig"]) -> "TraefikConfig":
+    middlewares = {}
+    for config in configs:
+        middlewares.update(config['middlewares'])
+
+    traefik_config = {
+        "http": {
+            "routers": {config["router_name"]: config["router"] for config in configs},
+            "services": {config["service_name"]: config["service"] for config in configs},
+            "middlewares": middlewares
+        }
+    }
+    return traefik_config

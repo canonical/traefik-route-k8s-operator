@@ -144,3 +144,45 @@ async def test_relation_data(ops_test: OpsTest):
     """
     )
     assert config.strip() == expected_config.strip(), config
+
+
+async def test_configure_prefix_strip(ops_test: OpsTest):
+    async with fast_forward(ops_test):
+        await ops_test.juju("config", APP_NAME, f"strip_prefix=bar")
+
+    # check databag content to verify it's what we think it should be
+    traefik_unit = TRAEFIK_MOCK_NAME + "/0"
+    return_code, stdout, stderr = await ops_test.juju("show-unit", traefik_unit)
+    data = yaml.safe_load(stdout)
+    try:
+        config = data[traefik_unit]["relation-info"][0]["application-data"]["config"]
+    except Exception:
+        print(return_code, stdout, stderr, data)
+        raise
+
+    model_name = ops_test.model_name
+    unit_name = INGRESS_REQUIRER_MOCK_NAME + "-0"
+    url = MOCK_ROOT_URL_TEMPLATE.replace("{{juju_unit}}", unit_name)
+
+    expected_config = textwrap.dedent(f"""
+    http:
+      routers:
+        juju-{unit_name}-{model_name}-router:
+          entryPoints:
+          - web
+          rule: Host(`{unit_name}.foo`)
+          service: juju-{unit_name}-{model_name}-service
+          middlewares: 
+          - juju-{unit_name}-{model_name}-stripprefix
+      services:
+        juju-{unit_name}-{model_name}-service:
+          loadBalancer:
+            servers:
+            - url: {url}
+      middlewares:
+       - juju-{unit_name}-{model_name}-stripprefix: 
+         prefixes: [`/foo`]
+    """
+    )
+    assert config.strip() == expected_config.strip(), config
+

@@ -18,7 +18,8 @@ from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
 
 # if typing.TYPE_CHECKING:
 from route_config import RouteConfig, _RouteConfig
-from traefik import TraefikConfig, UnitConfig, generate_unit_config
+from traefik import TraefikConfig, UnitConfig, generate_unit_config, \
+    merge_configs
 
 logger = logging.getLogger(__name__)
 
@@ -215,20 +216,9 @@ class TraefikRouteK8SCharm(CharmBase):
             logger.info(f"publishing to {unit_data['name']}: {config_data.root_url}")
             ingress.publish_url(relation, unit_data["name"], config_data.root_url)
 
-        # merge configs?
-        config = self._merge_traefik_configs(unit_configs)
+        config = merge_configs(unit_configs)
         if self.traefik_route.is_ready():
             self.traefik_route.submit_to_traefik(config=config)
-
-    @staticmethod
-    def _merge_traefik_configs(configs: Iterable["UnitConfig"]) -> "TraefikConfig":
-        traefik_config = {
-            "http": {
-                "routers": {config["router_name"]: config["router"] for config in configs},
-                "services": {config["service_name"]: config["service"] for config in configs},
-            }
-        }
-        return traefik_config
 
 
 if __name__ == "__main__":
