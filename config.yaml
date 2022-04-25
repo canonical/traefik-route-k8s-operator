@@ -66,3 +66,27 @@ options:
         root_url="doobadooba.com/choo" 
       
     type: string
+
+  strip_prefix:
+    default:
+    description: >
+      The prefix to strip from the route being forwarded to the app 
+      requesting ingress.
+      
+      If provided, it will configure Traefik with a `stripprefix`-type middleware
+      (Traefik will add a `X-Forwarded-Prefix: [strip_prefix]` header to
+      the forwarded requests).
+      For documentation see: https://doc.traefik.io/traefik/migration/v1-to-v2/#strip-and-rewrite-path-prefixes
+      
+      Example usage:
+      suppose you have configured route with:
+        
+        root_url="{{juju_model}}-{{juju_unit}}.foo.bar/baz"
+        rule="PathPrefix(`/baz`)"
+        
+      adding
+        
+        strip_prefix="baz"
+      
+      will strip the prefix `/baz` from the requests forwarded by Traefik.
+    type: string

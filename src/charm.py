@@ -5,10 +5,7 @@
 """Charm the service."""
 
 import logging
-from dataclasses import dataclass
-from itertools import starmap
 from typing import Iterable, Optional, Tuple
-from urllib.parse import urlparse
 
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, RequirerData
 from charms.traefik_route_k8s.v0.traefik_route import (
@@ -20,94 +17,10 @@ from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
 
 # if typing.TYPE_CHECKING:
-from types_ import TraefikConfig, UnitConfig
+from route_config import RouteConfig, _RouteConfig
+from traefik import TraefikConfig, UnitConfig, generate_unit_config
 
 logger = logging.getLogger(__name__)
-
-
-class RuleDerivationError(RuntimeError):
-    """Raised when a rule cannot be derived from other config parameters.
-
-    Solution: provide the rule manually, or fix what's broken.
-    """
-
-    def __init__(self, url, *args):
-        msg = f"Unable to derive Rule from {url}; ensure that the url is valid."
-        super(RuleDerivationError, self).__init__(msg, *args)
-
-
-@dataclass
-class RouteConfig:
-    """Route configuration."""
-
-    root_url: str
-    rule: str
-    id_: str
-
-
-@dataclass
-class _RouteConfig:
-    root_url: str
-    rule: str = None
-
-    @property
-    def is_valid(self):
-        def _check_var(obj: str, name):
-            error = None
-            # None or empty string or whitespace-only string
-            if not obj or not obj.strip():
-                error = (
-                    f"`{name}` not configured; do `juju config <traefik-route-charm> "
-                    f"{name}=<{name.upper()}>; juju resolve <traefik-route-charm>`"
-                )
-
-            elif obj != (stripped := obj.strip()):
-                error = (
-                    f"{name} {obj!r} starts or ends with whitespace;" f"it should be {stripped!r}."
-                )
-
-            if error:
-                logger.error(error)
-            return not error
-
-        if not self.rule:
-            # we can guess the rule from the root_url.
-            return _check_var(self.root_url, "root_url")
-
-        # TODO: think about further validating `rule` (regex?)
-        valid = starmap(_check_var, ((self.rule, "rule"), (self.root_url, "root_url")))
-        return all(valid)
-
-    def render(self, model_name: str, unit_name: str, app_name: str):
-        """Fills in the blanks in the templates."""
-        # todo make proper jinja2 thing here
-        def _render(obj: str):
-            for key, value in (
-                ("{{juju_model}}", model_name),
-                ("{{juju_application}}", app_name),
-                ("{{juju_unit}}", unit_name),
-            ):
-                if key in obj:
-                    obj = obj.replace(key, value)
-            return obj
-
-        url = _render(self.root_url)
-        if not self.rule:
-            rule = self.generate_rule_from_url(url)
-        else:
-            rule = _render(self.rule)
-
-        # an easily recognizable id for the traefik services
-        id_ = "-".join((unit_name, model_name))
-        return RouteConfig(rule=rule, root_url=url, id_=id_)
-
-    @staticmethod
-    def generate_rule_from_url(url) -> str:
-        """Derives a Traefik router Host rule from the provided `url`'s hostname."""
-        url_ = urlparse(url)
-        if not url_.hostname:
-            raise RuleDerivationError(url)
-        return f"Host(`{url_.hostname}`)"
 
 
 class TraefikRouteK8SCharm(CharmBase):
@@ -183,7 +96,11 @@ class TraefikRouteK8SCharm(CharmBase):
 
     @property
     def _config(self) -> _RouteConfig:
-        return _RouteConfig(rule=self.config.get("rule"), root_url=self.config.get("root_url"))
+        return _RouteConfig(
+            rule=self.config.get("rule"),
+            root_url=self.config.get("root_url"),
+            strip_prefix=self.config.get("strip_prefix"),
+        )
 
     @property
     def rule(self) -> Optional[str]:
@@ -288,7 +205,7 @@ class TraefikRouteK8SCharm(CharmBase):
         for unit in ready_units:  # units requesting ingress
             unit_data = ingress.get_data(self._ipu_relation, unit)
             config_data = self._config_for_unit(unit_data)
-            unit_config = self._generate_traefik_unit_config(config_data)
+            unit_config = generate_unit_config(config_data)
             unit_configs.append(unit_config)
 
             # we can publish the url to the unit immediately, but this might race
@@ -302,25 +219,6 @@ class TraefikRouteK8SCharm(CharmBase):
         config = self._merge_traefik_configs(unit_configs)
         if self.traefik_route.is_ready():
             self.traefik_route.submit_to_traefik(config=config)
-
-    @staticmethod
-    def _generate_traefik_unit_config(config: RouteConfig) -> "UnitConfig":
-        rule, config_id, url = config.rule, config.id_, config.root_url
-
-        traefik_router_name = f"juju-{config_id}-router"
-        traefik_service_name = f"juju-{config_id}-service"
-
-        config: "UnitConfig" = {
-            "router": {
-                "rule": rule,
-                "service": traefik_service_name,
-                "entryPoints": ["web"],
-            },
-            "router_name": traefik_router_name,
-            "service": {"loadBalancer": {"servers": [{"url": url}]}},
-            "service_name": traefik_service_name,
-        }
-        return config
 
     @staticmethod
     def _merge_traefik_configs(configs: Iterable["UnitConfig"]) -> "TraefikConfig":
