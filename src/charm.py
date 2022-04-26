@@ -33,7 +33,7 @@ class RuleDerivationError(RuntimeError):
     """
 
     def __init__(self, url: str, *args):
-        msg = f"Unable to derive Rule from {url}; ensure that the url is valid."
+        msg = f"Unable to derive Rule from {url!r}; ensure that the url is valid."
         super().__init__(msg, *args)
 
 
@@ -77,8 +77,8 @@ class _RouteConfig:
             # None or empty string or whitespace-only string
             if not obj or not obj.strip():
                 error = (
-                    f"`{name}` not configured; do `juju config <traefik-route-charm> "
-                    f"{name}=<{name.upper()}>; juju resolve <traefik-route-charm>`"
+                    f"`{name}` not configured; run `juju config <traefik-route-charm> "
+                    f"{name}=<{name.upper()}>"
                 )
 
             elif obj != (stripped := obj.strip()):
@@ -90,12 +90,14 @@ class _RouteConfig:
                 logger.error(error)
             return not error
 
-        try:
-            # try rendering with dummy values; it should succeed.
-            self.render(model_name="foo", unit_name="bar", app_name="baz")
-        except TemplateKeyError as e:
-            logger.error(e)
-            return False
+        if self.root_url:
+            # has no sense checking this unless root_url is set
+            try:
+                # try rendering with dummy values; it should succeed.
+                self.render(model_name="foo", unit_name="bar", app_name="baz")
+            except (TemplateKeyError, RuleDerivationError) as e:
+                logger.error(e)
+                return False
 
         if not self.rule:
             # we can guess the rule from the root_url.
