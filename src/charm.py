@@ -5,11 +5,13 @@
 """Charm the service."""
 
 import logging
+import textwrap
 from dataclasses import dataclass
 from itertools import starmap
 from typing import Iterable, Optional, Tuple
 from urllib.parse import urlparse
 
+import jinja2
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, RequirerData
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteRequirer,
@@ -19,7 +21,6 @@ from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
 
-# if typing.TYPE_CHECKING:
 from types_ import TraefikConfig, UnitConfig
 
 logger = logging.getLogger(__name__)
@@ -31,9 +32,28 @@ class RuleDerivationError(RuntimeError):
     Solution: provide the rule manually, or fix what's broken.
     """
 
-    def __init__(self, url, *args):
+    def __init__(self, url: str, *args):
         msg = f"Unable to derive Rule from {url}; ensure that the url is valid."
-        super(RuleDerivationError, self).__init__(msg, *args)
+        super().__init__(msg, *args)
+
+
+class TemplateKeyError(RuntimeError):
+    """Raised when a template contains a key which we cannot provide.
+
+    Solution: fix the template to only include the variables:
+        - `juju_model`
+        - `juju_application`
+        - `juju_unit`
+    """
+
+    def __init__(self, template: str, key: str, *args):
+        msg = textwrap.dedent(
+            f"""Unable to render the template {template!r}: {key!r} unknown.
+                - `juju_model`
+                - `juju_application`
+                - `juju_unit`"""
+        )
+        super().__init__(msg, *args)
 
 
 @dataclass
@@ -70,6 +90,13 @@ class _RouteConfig:
                 logger.error(error)
             return not error
 
+        try:
+            # try rendering with dummy values; it should succeed.
+            self.render(model_name="foo", unit_name="bar", app_name="baz")
+        except TemplateKeyError as e:
+            logger.error(e)
+            return False
+
         if not self.rule:
             # we can guess the rule from the root_url.
             return _check_var(self.root_url, "root_url")
@@ -80,16 +107,18 @@ class _RouteConfig:
 
     def render(self, model_name: str, unit_name: str, app_name: str):
         """Fills in the blanks in the templates."""
-        # todo make proper jinja2 thing here
+
         def _render(obj: str):
-            for key, value in (
-                ("{{juju_model}}", model_name),
-                ("{{juju_application}}", app_name),
-                ("{{juju_unit}}", unit_name),
-            ):
-                if key in obj:
-                    obj = obj.replace(key, value)
-            return obj
+            # StrictUndefined will raise an exception if some undefined
+            # variables are left unrendered in the template
+            template = jinja2.Template(obj, undefined=jinja2.StrictUndefined)
+            try:
+                return template.render(
+                    juju_model=model_name, juju_application=app_name, juju_unit=unit_name
+                )
+            except jinja2.UndefinedError as e:
+                undefined_key = e.message.split()[0].strip(r"'")
+                raise TemplateKeyError(obj, undefined_key) from e
 
         url = _render(self.root_url)
         if not self.rule:
