@@ -5,7 +5,7 @@
 """Charm the service."""
 
 import logging
-from typing import Iterable, Optional, Tuple
+from typing import Optional, Tuple
 
 from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, RequirerData
 from charms.traefik_route_k8s.v0.traefik_route import (
@@ -18,7 +18,7 @@ from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
 
 # if typing.TYPE_CHECKING:
 from route_config import RouteConfig, _RouteConfig
-from traefik import TraefikConfig, UnitConfig, generate_unit_config, merge_configs
+from traefik import generate_unit_config, merge_configs
 
 logger = logging.getLogger(__name__)
 

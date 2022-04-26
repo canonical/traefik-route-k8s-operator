@@ -5,7 +5,7 @@
 """Traefik configuration interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterable, List, Mapping
+from typing import Dict, Iterable, List
 
 from route_config import RouteConfig
 
@@ -58,26 +58,30 @@ class TraefikConfig(TypedDict):  # noqa: D101
     http: Http
 
 
-class Middleware(ABC):
+class Middleware(ABC):  # noqa: D101
     @property
     @abstractmethod
-    def name(self) -> str:
+    def name(self) -> str:  # noqa: D102
         ...
 
     @abstractmethod
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict:  # noqa: D102
         ...
 
 
 class StripPrefixMiddleware(Middleware):
+    """Middleware to instruct Traefik to strip the prefix of routed urls."""
+
     def __init__(self, prefix):
         self.prefix = prefix
 
     @property
     def name(self):
+        """Middleware name."""
         return f"juju-{self.prefix}-stripprefix"
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
+        """Serialize middleware to dict."""
         return {
             "stripPrefix": {
                 "prefixes": [f"/{self.prefix}"],
@@ -86,6 +90,7 @@ class StripPrefixMiddleware(Middleware):
 
 
 def generate_unit_config(config: RouteConfig) -> "UnitConfig":
+    """Transform route config into unit config."""
     rule, config_id, url = config.rule, config.id_, config.root_url
 
     traefik_router_name = f"juju-{config_id}-router"
@@ -111,6 +116,7 @@ def generate_unit_config(config: RouteConfig) -> "UnitConfig":
 
 
 def merge_configs(configs: Iterable["UnitConfig"]) -> "TraefikConfig":
+    """Merge many unit configs into a traefik-consumable config object."""
     middlewares = {}
     for config in configs:
         middlewares.update(config["middlewares"])

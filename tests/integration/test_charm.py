@@ -5,7 +5,6 @@ import asyncio
 import contextlib
 import logging
 import os
-import textwrap
 from pathlib import Path
 
 import pytest
@@ -149,7 +148,7 @@ async def test_relation_data(ops_test: OpsTest):
 
 async def test_configure_prefix_strip(ops_test: OpsTest):
     async with fast_forward(ops_test):
-        await ops_test.juju("config", APP_NAME, f"strip_prefix=bar")
+        await ops_test.juju("config", APP_NAME, "strip_prefix=bar")
 
     # check databag content to verify it's what we think it should be
     traefik_unit = TRAEFIK_MOCK_NAME + "/0"

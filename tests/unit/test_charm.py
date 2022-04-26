@@ -31,6 +31,7 @@ EXPECTED_TRAEFIK_CONFIG = {
                 "loadBalancer": {"servers": [{"url": "http://foo.bar/model-remote-0"}]}
             }
         },
+        "middlewares": {},
     }
 }
 

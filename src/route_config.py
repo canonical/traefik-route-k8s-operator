@@ -78,8 +78,7 @@ class _RouteConfig:
 
     def render(self, model_name: str, unit_name: str, app_name: str):
         """Fills in the blanks in the templates."""
-
-        # todo make proper jinja2 thing here
+        # TODO make proper jinja2 thing here
         def _render(obj: str):
             for key, value in (
                 ("{{juju_model}}", model_name),
