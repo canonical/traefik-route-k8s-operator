@@ -18,8 +18,7 @@ from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
 
 # if typing.TYPE_CHECKING:
 from route_config import RouteConfig, _RouteConfig
-from traefik import TraefikConfig, UnitConfig, generate_unit_config, \
-    merge_configs
+from traefik import TraefikConfig, UnitConfig, generate_unit_config, merge_configs
 
 logger = logging.getLogger(__name__)
 

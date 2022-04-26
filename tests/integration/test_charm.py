@@ -12,8 +12,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.conftest import INGRESS_REQUIRER_MOCK_NAME, \
-    TRAEFIK_MOCK_NAME
+from tests.integration.conftest import INGRESS_REQUIRER_MOCK_NAME, TRAEFIK_MOCK_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +21,7 @@ APP_NAME = METADATA["name"]
 MOCK_ROOT_URL_TEMPLATE = "http://{{juju_unit}}.foo/bar/"
 
 
-async def assert_status_reached(ops_test, status: str, apps=(APP_NAME,),
-                                raise_on_blocked=True):
+async def assert_status_reached(ops_test, status: str, apps=(APP_NAME,), raise_on_blocked=True):
     print(f"waiting for {apps} to reach {status}...")
 
     await ops_test.model.wait_for_idle(
@@ -33,8 +31,7 @@ async def assert_status_reached(ops_test, status: str, apps=(APP_NAME,),
         raise_on_blocked=False if status == "blocked" else raise_on_blocked,
     )
     for app in apps:
-        assert ops_test.model.applications[app].units[
-                   0].workload_status == status
+        assert ops_test.model.applications[app].units[0].workload_status == status
 
 
 @contextlib.asynccontextmanager
@@ -58,18 +55,15 @@ async def test_unit_blocked_on_deploy(ops_test: OpsTest):
 
 # both mock charms should start as blocked until they're related
 async def test_deploy_traefik_mock(ops_test: OpsTest, traefik_mock_charm):
-    await ops_test.model.deploy(traefik_mock_charm,
-                                application_name=TRAEFIK_MOCK_NAME)
+    await ops_test.model.deploy(traefik_mock_charm, application_name=TRAEFIK_MOCK_NAME)
     await ops_test.model.wait_for_idle([TRAEFIK_MOCK_NAME], status="blocked")
 
 
-async def test_deploy_ingress_requirer_mock(ops_test: OpsTest,
-                                            ingress_requirer_mock_charm):
+async def test_deploy_ingress_requirer_mock(ops_test: OpsTest, ingress_requirer_mock_charm):
     await ops_test.model.deploy(
         ingress_requirer_mock_charm, application_name=INGRESS_REQUIRER_MOCK_NAME
     )
-    await ops_test.model.wait_for_idle([INGRESS_REQUIRER_MOCK_NAME],
-                                       status="blocked")
+    await ops_test.model.wait_for_idle([INGRESS_REQUIRER_MOCK_NAME], status="blocked")
 
 
 async def test_unit_blocked_after_config(ops_test: OpsTest):
@@ -95,16 +89,14 @@ async def test_relations(ops_test: OpsTest):
         # prometheus' endpoint is called 'ingress',
         # but our mock charm calls it 'ingress-per-unit'
         ops_test.model.add_relation(
-            f"{INGRESS_REQUIRER_MOCK_NAME}:ingress-per-unit",
-            f"{APP_NAME}:ingress-per-unit"
+            f"{INGRESS_REQUIRER_MOCK_NAME}:ingress-per-unit", f"{APP_NAME}:ingress-per-unit"
         ),
     )
 
     async with fast_forward(ops_test):
         # route will go to blocked until it's configured properly
         # so let's make sure it's configured:
-        await ops_test.juju("config", APP_NAME,
-                            f"root_url={MOCK_ROOT_URL_TEMPLATE}")
+        await ops_test.juju("config", APP_NAME, f"root_url={MOCK_ROOT_URL_TEMPLATE}")
         # after this it will eventually reach active
 
         # both mock charms will go to WaitingStatus until their relation
@@ -126,8 +118,7 @@ async def test_relation_data(ops_test: OpsTest):
     return_code, stdout, stderr = await ops_test.juju("show-unit", traefik_unit)
     data = yaml.safe_load(stdout)
     try:
-        config = data[traefik_unit]["relation-info"][0]["application-data"][
-            "config"]
+        config = data[traefik_unit]["relation-info"][0]["application-data"]["config"]
     except Exception:
         print(return_code, stdout, stderr, data)
         raise
@@ -136,13 +127,22 @@ async def test_relation_data(ops_test: OpsTest):
     unit_name = INGRESS_REQUIRER_MOCK_NAME + "-0"
     url = MOCK_ROOT_URL_TEMPLATE.replace("{{juju_unit}}", unit_name)
 
-    expected_config = {'http': {'routers': {
-        f'juju-{unit_name}-{model_name}-router': {
-            'entryPoints': ['web'],
-            'rule': f'Host(`{unit_name}.foo`)',
-            'service': f'juju-{unit_name}-{model_name}-service'}},
-        'services': {f'juju-{unit_name}-{model_name}-service': {
-            'loadBalancer': {'servers': [{'url': url}]}}}}}
+    expected_config = {
+        "http": {
+            "routers": {
+                f"juju-{unit_name}-{model_name}-router": {
+                    "entryPoints": ["web"],
+                    "rule": f"Host(`{unit_name}.foo`)",
+                    "service": f"juju-{unit_name}-{model_name}-service",
+                }
+            },
+            "services": {
+                f"juju-{unit_name}-{model_name}-service": {
+                    "loadBalancer": {"servers": [{"url": url}]}
+                }
+            },
+        }
+    }
 
     assert yaml.safe_load(config) == expected_config, config
 
@@ -156,8 +156,7 @@ async def test_configure_prefix_strip(ops_test: OpsTest):
     return_code, stdout, stderr = await ops_test.juju("show-unit", traefik_unit)
     data = yaml.safe_load(stdout)
     try:
-        config = data[traefik_unit]["relation-info"][0]["application-data"][
-            "config"]
+        config = data[traefik_unit]["relation-info"][0]["application-data"]["config"]
     except Exception:
         print(return_code, stdout, stderr, data)
         raise
@@ -166,16 +165,23 @@ async def test_configure_prefix_strip(ops_test: OpsTest):
     unit_name = INGRESS_REQUIRER_MOCK_NAME + "-0"
     url = MOCK_ROOT_URL_TEMPLATE.replace("{{juju_unit}}", unit_name)
 
-    expected_config = {'http': {'routers': {
-        f'juju-{unit_name}-{model_name}-router': {
-            'entryPoints': ['web'],
-            'middlewares': [f'juju-{unit_name}-{model_name}-stripprefix'],
-            'rule': f'Host(`{unit_name}.foo`)',
-            'service': f'juju-{unit_name}-{model_name}-service'}},
-        'services': {f'juju-{unit_name}-{model_name}-service': {
-            'loadBalancer': {'servers': [{'url': url}]}}},
-        'middlewares': {f"juju-{unit_name}-{model_name}-stripprefix":
-                            {"prefixes": ["/foo"]}
-                        }}}
+    expected_config = {
+        "http": {
+            "routers": {
+                f"juju-{unit_name}-{model_name}-router": {
+                    "entryPoints": ["web"],
+                    "middlewares": [f"juju-{unit_name}-{model_name}-stripprefix"],
+                    "rule": f"Host(`{unit_name}.foo`)",
+                    "service": f"juju-{unit_name}-{model_name}-service",
+                }
+            },
+            "services": {
+                f"juju-{unit_name}-{model_name}-service": {
+                    "loadBalancer": {"servers": [{"url": url}]}
+                }
+            },
+            "middlewares": {f"juju-{unit_name}-{model_name}-stripprefix": {"prefixes": ["/foo"]}},
+        }
+    }
 
     assert yaml.safe_load(config) == expected_config, config

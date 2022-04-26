@@ -5,7 +5,7 @@
 """Traefik configuration interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Mapping, Iterable
+from typing import Any, Dict, Iterable, List, Mapping
 
 from route_config import RouteConfig
 
@@ -52,6 +52,7 @@ class Http(TypedDict):  # noqa: D101
     routers: Dict[RouterName, Router]
     services: Dict[ServiceName, Router]
     middlewares: Dict[MiddlewareName, Dict]
+
 
 class TraefikConfig(TypedDict):  # noqa: D101
     http: Http
@@ -112,13 +113,13 @@ def generate_unit_config(config: RouteConfig) -> "UnitConfig":
 def merge_configs(configs: Iterable["UnitConfig"]) -> "TraefikConfig":
     middlewares = {}
     for config in configs:
-        middlewares.update(config['middlewares'])
+        middlewares.update(config["middlewares"])
 
     traefik_config = {
         "http": {
             "routers": {config["router_name"]: config["router"] for config in configs},
             "services": {config["service_name"]: config["service"] for config in configs},
-            "middlewares": middlewares
+            "middlewares": middlewares,
         }
     }
     return traefik_config
