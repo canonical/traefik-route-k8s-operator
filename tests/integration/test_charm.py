@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.conftest import INGRESS_REQUIRER_MOCK_NAME, TRAEFIK_MOCK_NAME
@@ -68,16 +69,15 @@ async def test_deploy_ingress_requirer_mock(ops_test: OpsTest, ingress_requirer_
 
 async def test_unit_blocked_after_config(ops_test: OpsTest):
     # configure
-    await ops_test.juju("config", APP_NAME, "root_url=http://foo/")
+    app: Application = ops_test.model.applications.get(APP_NAME)
+    await app.set_config({"root_url": "http://foo/"})
 
     # now we're blocked still, because we have no relations.
     async with fast_forward(ops_test):
         await assert_status_reached(ops_test, "blocked")
 
     # cleanup!
-    os.system(f'juju config {APP_NAME} root_url=""')
-    # NB: doing this will result in root_url being '""'!
-    #  await ops_test.juju("config", APP_NAME, 'root_url=""')
+    await app.reset_config(['root_url'])
 
 
 async def test_relations(ops_test: OpsTest):
