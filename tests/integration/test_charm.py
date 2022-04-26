@@ -76,7 +76,7 @@ async def test_unit_blocked_after_config(ops_test: OpsTest):
         await assert_status_reached(ops_test, "blocked")
 
     # cleanup!
-    await app.reset_config(['root_url'])
+    await app.reset_config(["root_url"])
 
 
 async def test_relations(ops_test: OpsTest):
