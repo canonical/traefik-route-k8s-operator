@@ -19,7 +19,6 @@ from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
 
-# if typing.TYPE_CHECKING:
 from types_ import TraefikConfig, UnitConfig
 
 logger = logging.getLogger(__name__)
