@@ -2,7 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Charm the service."""
+"""Traefik Route k8s charm."""
 
 import logging
 from dataclasses import dataclass
