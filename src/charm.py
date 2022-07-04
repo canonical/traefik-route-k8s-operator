@@ -2,7 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Traefik Route k8s charm."""
+"""Traefik Route charm for kubernetes."""
 
 import logging
 from dataclasses import dataclass
