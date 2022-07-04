@@ -62,8 +62,7 @@ def test_blocked_status_on_default_config_changed(harness: Harness[TraefikRouteK
         ({"root_url": "http://foo.com "}, False),
         ({"root_url": "http://foo.com"}, True),
         ({"root_url": "http://{{juju_unit}}.com"}, True),
-        # should be False after jinja integration
-        ({"root_url": "http://{{kadoodle}}.com"}, True),
+        ({"root_url": "http://{{kadoodle}}.com"}, False),
     ),
 )
 def test_config_validity(harness: Harness[TraefikRouteK8SCharm], config: dict, valid: bool):
