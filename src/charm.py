@@ -12,14 +12,15 @@ from typing import Iterable, Optional, Tuple
 from urllib.parse import urlparse
 
 import jinja2
-from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitProvider, RequirerData
-from charms.traefik_route_k8s.v0.traefik_route import (
-    TraefikRouteRequirer,
-    TraefikRouteRequirerReadyEvent,
+from charms.traefik_k8s.v1.ingress_per_unit import (
+    IngressDataReadyEvent,
+    IngressPerUnitProvider,
+    RequirerData,
 )
+from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, Relation, Unit, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, Relation, Unit
 
 from types_ import TraefikConfig, UnitConfig
 
@@ -162,7 +163,7 @@ class TraefikRouteK8SCharm(CharmBase):
 
         observe = self.framework.observe
         observe(self.on.config_changed, self._on_config_changed)
-        observe(self.ingress_per_unit.on.ready, self._on_ingress_ready)
+        observe(self.ingress_per_unit.on.data_provided, self._on_ingress_data_provided)
 
         # todo wipe all data if and when TR 'stops' being ready
         #  (e.g. config change breaks the config)
@@ -258,11 +259,8 @@ class TraefikRouteK8SCharm(CharmBase):
         if not ipu_relation:
             self.unit.status = BlockedStatus("Awaiting to be related via ingress-per-unit.")
             return False
-        elif self.ingress_per_unit.is_failed(ipu_relation):
-            self.unit.status = BlockedStatus("ingress-per-unit relation is broken (failed).")
-            return False
-        elif not self.ingress_per_unit.is_available(ipu_relation):
-            self.unit.status = WaitingStatus("ingress-per-unit is not available yet.")
+        elif not self.ingress_per_unit.is_ready(ipu_relation):
+            self.unit.status = BlockedStatus("ingress-per-unit relation is not ready.")
             return False
 
         # validate traefik-route relation status
@@ -274,7 +272,7 @@ class TraefikRouteK8SCharm(CharmBase):
 
         return True
 
-    def _on_ingress_ready(self, event: TraefikRouteRequirerReadyEvent):
+    def _on_ingress_data_provided(self, event: IngressDataReadyEvent):
         """The route requirer (aka this charm) is ready.
 
         That is, it can forward to Traefik the config Traefik will need to provide ingress.

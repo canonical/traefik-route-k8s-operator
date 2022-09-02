@@ -6,10 +6,10 @@
 
 import logging
 
-from charms.traefik_k8s.v0.ingress_per_unit import IngressPerUnitRequirer
+from charms.traefik_k8s.v1.ingress_per_unit import IngressPerUnitRequirer
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, Model, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus
 
 logger = logging.getLogger(__name__)
 
@@ -23,20 +23,16 @@ class TraefikMockCharm(CharmBase):
             self.unit.status = BlockedStatus("no leadership")
             return
 
-        ingress = IngressPerUnitRequirer(charm=self)
-        model: Model = self.model
-        ipu_relations = model.relations.get("ingress-per-unit")
+        self.ingress = IngressPerUnitRequirer(charm=self, host="0.0.0.0", port=80)
+        self.framework.observe(self.on.install, self._set_blocked)
+        self.framework.observe(self.ingress.on.ready_for_unit, self._set_ready)
+        self.framework.observe(self.ingress.on.revoked_for_unit, self._set_blocked)
 
-        if ipu_relations:
-            ipu_relation = ipu_relations[0]
-            ingress.provide_ingress_requirements(host="0.0.0.0", port=80)
+    def _set_blocked(self, _):
+        self.unit.status = BlockedStatus("no ingress")
 
-            if ingress.is_ready(ipu_relation):
-                self.unit.status = ActiveStatus("all good!")
-            else:
-                self.unit.status = WaitingStatus("ipu not ready yet")
-        else:
-            self.unit.status = BlockedStatus("ipu not related")
+    def _set_ready(self, _):
+        self.unit.status = ActiveStatus("all good!")
 
 
 if __name__ == "__main__":

@@ -76,7 +76,7 @@ import logging
 from typing import Optional
 
 import yaml
-from ops.charm import CharmBase, RelationEvent, CharmEvents
+from ops.charm import CharmBase, CharmEvents, RelationEvent
 from ops.framework import EventSource, Object
 from ops.model import Relation
 
@@ -109,13 +109,9 @@ class TraefikRouteRequirerReadyEvent(RelationEvent):
     """Event emitted when a unit requesting ingress has provided all data Traefik needs."""
 
 
-class TraefikRouteRequirerEvents(CharmEvents):
-    """Container for TraefikRouteRequirer events."""
-    ready = EventSource(TraefikRouteRequirerReadyEvent)
-
-
 class TraefikRouteProviderEvents(CharmEvents):
     """Container for TraefikRouteProvider events."""
+
     ready = EventSource(TraefikRouteProviderReadyEvent)
 
 
@@ -129,9 +125,10 @@ class TraefikRouteProvider(Object):
     is there.
     The TraefikRouteProvider provides api to do this easily.
     """
+
     on = TraefikRouteProviderEvents()
 
-    def __init__(self, charm: CharmBase, relation_name: str = 'traefik-route'):
+    def __init__(self, charm: CharmBase, relation_name: str = "traefik-route"):
         """Constructor for TraefikRouteProvider.
 
         Args:
@@ -141,8 +138,9 @@ class TraefikRouteProvider(Object):
         """
         super().__init__(charm, relation_name)
         self.charm = charm
-        self.framework.observe(self.charm.on[relation_name].relation_changed,
-                               self._on_relation_changed)
+        self.framework.observe(
+            self.charm.on[relation_name].relation_changed, self._on_relation_changed
+        )
 
     def _on_relation_changed(self, event: RelationEvent):
         if self.is_ready(event.relation):
@@ -152,16 +150,16 @@ class TraefikRouteProvider(Object):
     @staticmethod
     def is_ready(relation: Relation) -> bool:
         """Whether TraefikRoute is ready on this relation: i.e. the remote app shared the config."""
-        return 'config' in relation.data[relation.app]
+        return "config" in relation.data[relation.app]
 
     @staticmethod
     def get_config(relation: Relation) -> Optional[str]:
         """Retrieve the config published by the remote application."""
         # todo validate this config
-        return relation.data[relation.app].get('config')
+        return relation.data[relation.app].get("config")
 
 
-class TraefikRouteRequirer(Object):
+class TraefikRouteRequirer:
     """Wrapper for the requirer side of traefik-route.
 
     The traefik_route requirer will publish to the application databag an object like:
@@ -174,11 +172,9 @@ class TraefikRouteRequirer(Object):
     The TraefikRouteRequirer provides api to store this config in the
     application databag.
     """
-    on = TraefikRouteRequirerEvents()
 
-    def __init__(self, charm: CharmBase, relation: Relation,
-                 relation_name: str = 'traefik-route'):
-        super(TraefikRouteRequirer, self).__init__(charm, relation_name)
+    def __init__(self, charm: CharmBase, relation: Relation, relation_name: str = "traefik-route"):
+        self._relation_name = relation_name  # legacy
         self._charm = charm
         self._relation = relation
 
@@ -198,4 +194,4 @@ class TraefikRouteRequirer(Object):
         app_databag = self._relation.data[self._charm.app]
 
         # Traefik thrives on yaml, feels pointless to talk json to Route
-        app_databag['config'] = yaml.safe_dump(config)
+        app_databag["config"] = yaml.safe_dump(config)
