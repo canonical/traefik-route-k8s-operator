@@ -82,5 +82,8 @@ def reinstantiate_charm(harness: Harness):
     harness.framework._forget(charm.ingress_per_unit.on)
     harness.framework._forget(charm.traefik_route)
     harness.framework._forget(charm.traefik_route.on)
+    harness.framework._objects.pop(
+        "TraefikRouteK8SCharm/TraefikRouteRequirer[traefik-route]/StoredStateData[_stored]", None
+    )
     harness._charm = None
     harness.begin()

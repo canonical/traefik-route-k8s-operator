@@ -44,7 +44,7 @@ async def fast_forward(ops_test, interval: str = "10s"):
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, traefik_route_charm):
-    await ops_test.model.deploy(traefik_route_charm, application_name=APP_NAME)
+    await ops_test.model.deploy(traefik_route_charm, application_name=APP_NAME, series="focal")
 
 
 async def test_unit_blocked_on_deploy(ops_test: OpsTest):
@@ -55,13 +55,15 @@ async def test_unit_blocked_on_deploy(ops_test: OpsTest):
 
 # both mock charms should start as blocked until they're related
 async def test_deploy_traefik_mock(ops_test: OpsTest, traefik_mock_charm):
-    await ops_test.model.deploy(traefik_mock_charm, application_name=TRAEFIK_MOCK_NAME)
+    await ops_test.model.deploy(
+        traefik_mock_charm, application_name=TRAEFIK_MOCK_NAME, series="focal"
+    )
     await ops_test.model.wait_for_idle([TRAEFIK_MOCK_NAME], status="blocked")
 
 
 async def test_deploy_ingress_requirer_mock(ops_test: OpsTest, ingress_requirer_mock_charm):
     await ops_test.model.deploy(
-        ingress_requirer_mock_charm, application_name=INGRESS_REQUIRER_MOCK_NAME
+        ingress_requirer_mock_charm, application_name=INGRESS_REQUIRER_MOCK_NAME, series="focal"
     )
     await ops_test.model.wait_for_idle([INGRESS_REQUIRER_MOCK_NAME], status="blocked")
 
