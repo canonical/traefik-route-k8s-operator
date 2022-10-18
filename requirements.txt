@@ -1,2 +1,4 @@
 ops >= 1.2.0
 Jinja2==3.0.3
+typing
+typing_extensions

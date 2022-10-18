@@ -51,21 +51,3 @@ async def traefik_mock_charm(ops_test: OpsTest):
 @pytest_asyncio.fixture
 async def ingress_requirer_mock_charm(ops_test: OpsTest):
     return await ops_test.build_charm("./tests/integration/ingress-requirer-mock")
-
-
-@pytest.fixture(scope="module")
-@pytest.mark.asyncio
-async def ops_test(request, tmp_path_factory):
-    check_deps("juju", "charmcraft")
-    ops_test = OpsTest(request, tmp_path_factory)
-    await ops_test._setup_model()
-    OpsTest._instance = ops_test
-    yield ops_test
-    OpsTest._instance = None
-
-    # FIXME: this is necessary because (for some reason) ops_test raises.
-    #  cf: https://github.com/charmed-kubernetes/pytest-operator/issues/71
-    try:
-        await ops_test._cleanup_models()
-    except websockets.exceptions.ConnectionClosed:
-        print("ignored a websockets.exceptions.ConnectionClosed error")
