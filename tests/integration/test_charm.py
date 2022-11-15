@@ -22,8 +22,9 @@ APP_NAME = METADATA["name"]
 MOCK_ROOT_URL_TEMPLATE = "http://{{juju_unit}}.foo/bar/"
 
 
-async def assert_status_reached(ops_test, status: str, apps=(APP_NAME,), raise_on_blocked=True,
-                                timeout=180):
+async def assert_status_reached(
+    ops_test, status: str, apps=(APP_NAME,), raise_on_blocked=True, timeout=180
+):
     print(f"waiting for {apps} to reach {status}...")
     assert not isinstance(apps, str)
     apps = list(apps)
@@ -62,14 +63,14 @@ async def test_deploy_traefik_mock(ops_test: OpsTest, traefik_mock_charm):
     await ops_test.model.deploy(
         traefik_mock_charm, application_name=TRAEFIK_MOCK_NAME, series="focal"
     )
-    await assert_status_reached(ops_test, "blocked", apps=(TRAEFIK_MOCK_NAME, ))
+    await assert_status_reached(ops_test, "blocked", apps=(TRAEFIK_MOCK_NAME,))
 
 
 async def test_deploy_ingress_requirer_mock(ops_test: OpsTest, ingress_requirer_mock_charm):
     await ops_test.model.deploy(
         ingress_requirer_mock_charm, application_name=INGRESS_REQUIRER_MOCK_NAME, series="focal"
     )
-    await assert_status_reached(ops_test, "blocked", apps=(INGRESS_REQUIRER_MOCK_NAME, ))
+    await assert_status_reached(ops_test, "blocked", apps=(INGRESS_REQUIRER_MOCK_NAME,))
 
 
 async def test_unit_blocked_after_config(ops_test: OpsTest):
@@ -114,7 +115,7 @@ async def test_relations(ops_test: OpsTest):
             # However, route was blocked moments ago, so it might still be blocked by the time
             # we start awaiting active; so we trust it will eventually unblock itself.
             raise_on_blocked=False,
-            timeout=5000
+            timeout=5000,
         )
 
 
