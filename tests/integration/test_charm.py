@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import logging
 import textwrap
+from asyncio import sleep
 from pathlib import Path
 
 import pytest
@@ -21,13 +22,17 @@ APP_NAME = METADATA["name"]
 MOCK_ROOT_URL_TEMPLATE = "http://{{juju_unit}}.foo/bar/"
 
 
-async def assert_status_reached(ops_test, status: str, apps=(APP_NAME,), raise_on_blocked=True):
+async def assert_status_reached(
+    ops_test, status: str, apps=(APP_NAME,), raise_on_blocked=True, timeout=180
+):
     print(f"waiting for {apps} to reach {status}...")
+    assert not isinstance(apps, str)
+    apps = list(apps)
 
     await ops_test.model.wait_for_idle(
         apps=apps,
         status=status,
-        timeout=180,
+        timeout=timeout,
         raise_on_blocked=False if status == "blocked" else raise_on_blocked,
     )
     for app in apps:
@@ -50,7 +55,7 @@ async def test_build_and_deploy(ops_test: OpsTest, traefik_route_charm):
 async def test_unit_blocked_on_deploy(ops_test: OpsTest):
     async with fast_forward(ops_test):
         # Route will go to blocked until configured
-        await assert_status_reached(ops_test, "blocked")
+        await assert_status_reached(ops_test, "blocked", timeout=5000)
 
 
 # both mock charms should start as blocked until they're related
@@ -58,20 +63,22 @@ async def test_deploy_traefik_mock(ops_test: OpsTest, traefik_mock_charm):
     await ops_test.model.deploy(
         traefik_mock_charm, application_name=TRAEFIK_MOCK_NAME, series="focal"
     )
-    await ops_test.model.wait_for_idle([TRAEFIK_MOCK_NAME], status="blocked")
+    await assert_status_reached(ops_test, "blocked", apps=(TRAEFIK_MOCK_NAME,))
 
 
 async def test_deploy_ingress_requirer_mock(ops_test: OpsTest, ingress_requirer_mock_charm):
     await ops_test.model.deploy(
         ingress_requirer_mock_charm, application_name=INGRESS_REQUIRER_MOCK_NAME, series="focal"
     )
-    await ops_test.model.wait_for_idle([INGRESS_REQUIRER_MOCK_NAME], status="blocked")
+    await assert_status_reached(ops_test, "blocked", apps=(INGRESS_REQUIRER_MOCK_NAME,))
 
 
 async def test_unit_blocked_after_config(ops_test: OpsTest):
     # configure
     app: Application = ops_test.model.applications.get(APP_NAME)
     await app.set_config({"root_url": "http://foo/"})
+
+    await sleep(5)  # give it some time to process the relation-changed...
 
     # now we're blocked still, because we have no relations.
     async with fast_forward(ops_test):
@@ -87,8 +94,6 @@ async def test_relations(ops_test: OpsTest):
         ops_test.model.add_relation(
             f"{TRAEFIK_MOCK_NAME}:traefik-route", f"{APP_NAME}:traefik-route"
         ),
-        # prometheus' endpoint is called 'ingress',
-        # but our mock charm calls it 'ingress-per-unit'
         ops_test.model.add_relation(
             f"{INGRESS_REQUIRER_MOCK_NAME}:ingress-per-unit", f"{APP_NAME}:ingress-per-unit"
         ),
@@ -110,6 +115,7 @@ async def test_relations(ops_test: OpsTest):
             # However, route was blocked moments ago, so it might still be blocked by the time
             # we start awaiting active; so we trust it will eventually unblock itself.
             raise_on_blocked=False,
+            timeout=5000,
         )
 
 
