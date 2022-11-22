@@ -73,21 +73,9 @@ def mock_happy_path(harness: Harness):
 
 
 def reinstantiate_charm(harness: Harness):
-    charm = harness.charm
-    fw = harness._framework
-    fw._forget(charm)
-    fw._forget(charm.on)
-    fw._forget(charm.ingress_per_unit)
-    fw._forget(charm.ingress_per_unit.on)
-    fw._forget(charm.traefik_route)
-    fw._forget(charm.traefik_route.on)
-    fw._objects.pop(
-        "TraefikRouteK8SCharm/TraefikRouteRequirer[traefik-route]/StoredStateData[_stored]", None
-    )
-
     # clear storage
     harness._storage = storage.SQLiteStorage(":memory:")
-    # clear framework
+    # reinitialize framework
     harness._framework = framework.Framework(
         harness._storage, harness._charm_dir, harness._meta, harness._model
     )

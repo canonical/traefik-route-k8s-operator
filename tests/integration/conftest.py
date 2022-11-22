@@ -7,7 +7,7 @@ from os import unlink
 
 import pytest
 import pytest_asyncio
-from pytest_operator.plugin import OpsTest, check_deps
+from pytest_operator.plugin import OpsTest
 
 TRAEFIK_MOCK_NAME = "traefik-mock"
 
