@@ -4,6 +4,7 @@
 import json
 
 import pytest as pytest
+from ops import framework, storage
 from ops.testing import Harness
 
 from charm import TraefikRouteK8SCharm
@@ -19,10 +20,7 @@ SAMPLE_CONFIG = {"rule": SAMPLE_RULE, "root_url": SAMPLE_URL}
 
 # mock of the data that the unit requesting ingress might share
 # when requesting ingress; as implemented by ipuRequirer
-SAMPLE_INGRESS_DATA = {
-    "data": {"model": MODEL_NAME, "name": REMOTE_UNIT_NAME, "host": "foo", "port": 42}
-}
-SAMPLE_INGRESS_DATA_ENCODED = {"data": json.dumps(SAMPLE_INGRESS_DATA["data"])}
+SAMPLE_INGRESS_DATA = {"model": MODEL_NAME, "name": REMOTE_UNIT_NAME, "host": "foo", "port": "42"}
 # mock of the data traefik might share when providing ingress to our remote unit
 SAMPLE_TRAEFIK_DATA = {REMOTE_UNIT_NAME: {"url": "https://foo.bar/baz"}}
 SAMPLE_TRAEFIK_DATA_ENCODED = {"ingress": json.dumps(SAMPLE_TRAEFIK_DATA)}
@@ -75,15 +73,12 @@ def mock_happy_path(harness: Harness):
 
 
 def reinstantiate_charm(harness: Harness):
-    charm = harness.charm
-    harness.framework._forget(charm)
-    harness.framework._forget(charm.on)
-    harness.framework._forget(charm.ingress_per_unit)
-    harness.framework._forget(charm.ingress_per_unit.on)
-    harness.framework._forget(charm.traefik_route)
-    harness.framework._forget(charm.traefik_route.on)
-    harness.framework._objects.pop(
-        "TraefikRouteK8SCharm/TraefikRouteRequirer[traefik-route]/StoredStateData[_stored]", None
+    # clear storage
+    harness._storage = storage.SQLiteStorage(":memory:")
+    # reinitialize framework
+    harness._framework = framework.Framework(
+        harness._storage, harness._charm_dir, harness._meta, harness._model
     )
+
     harness._charm = None
     harness.begin()

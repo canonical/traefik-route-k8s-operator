@@ -5,13 +5,15 @@ from unittest.mock import Mock
 
 import pytest
 import yaml
+from charms.harness_extensions.v0.capture_events import capture
+from charms.traefik_k8s.v1.ingress_per_unit import IngressDataReadyEvent
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 
 from charm import TraefikRouteK8SCharm
 from tests.unit.conftest import (
     REMOTE_UNIT_NAME,
-    SAMPLE_INGRESS_DATA_ENCODED,
+    SAMPLE_INGRESS_DATA,
     mock_config,
     mock_happy_path,
 )
@@ -93,29 +95,27 @@ def test_ingress_request_relaying_preconditions(harness: Harness[TraefikRouteK8S
 
     assert charm.unit.is_leader()
     assert (ipu_relation := charm._ipu_relation)
-    assert not charm.ingress_per_unit.is_failed(ipu_relation)
-    assert charm.ingress_per_unit.is_available(ipu_relation)
     assert not charm.ingress_per_unit.is_ready(ipu_relation)  # nothing's been shared yet
 
     tr_relation = charm.traefik_route._relation
     assert tr_relation.data[tr_relation.app] == {}
 
-    assert isinstance(charm.unit.status, ActiveStatus)
+    assert isinstance(charm.unit.status, BlockedStatus)
 
 
 def test_on_ingress_request_called(harness: Harness[TraefikRouteK8SCharm]):
-    """Test that _on_ingress_ready is being called on ipu relation change."""
+    """Test that _on_ingress_data_provided is being called on ipu relation change."""
     ipu_relation_id, route_relation_id = mock_happy_path(harness)
     charm = harness.charm
 
-    # check that _on_ingress_ready would have been called
-    # original_ingress_request = charm._on_ingress_ready
-    charm._on_ingress_ready = Mock(return_value=None)
-    # simulate the remote unit setting ingress data, as it would in response
-    # to ingress-per-unit-relation-joined
-    harness.update_relation_data(ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA_ENCODED)
-    assert charm._on_ingress_ready.called
+    # check that _on_ingress_data_provided would have been called
+    with capture(charm, IngressDataReadyEvent):
+        # simulate the remote unit setting ingress data, as it would in response
+        # to ingress-per-unit-relation-joined
+        harness.update_relation_data(ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA)
+
     assert charm.ingress_per_unit.is_ready(charm._ipu_relation)
+    assert isinstance(charm.unit.status, ActiveStatus)
 
 
 def test_ingress_submit_to_traefik_called(harness: Harness[TraefikRouteK8SCharm]):
@@ -130,7 +130,7 @@ def test_ingress_submit_to_traefik_called(harness: Harness[TraefikRouteK8SCharm]
     # check that submit_to_traefik would have been called
     charm.traefik_route.submit_to_traefik = Mock(return_value=None)
 
-    harness.update_relation_data(ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA_ENCODED)
+    harness.update_relation_data(ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA)
     charm.traefik_route.submit_to_traefik.assert_called_with(config=EXPECTED_TRAEFIK_CONFIG)
 
 
@@ -144,7 +144,7 @@ def test_ingress_request_forwarding_data(harness: Harness[TraefikRouteK8SCharm])
     charm = harness.charm
 
     # remote app requesting ingress: publish ingress data
-    harness.update_relation_data(ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA_ENCODED)
+    harness.update_relation_data(ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA)
     route_data = charm.traefik_route._relation.data
     assert route_data.get(charm.unit) == {}
     assert yaml.safe_load(route_data[charm.app]["config"]) == EXPECTED_TRAEFIK_CONFIG

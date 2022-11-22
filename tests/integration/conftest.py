@@ -26,7 +26,7 @@ def copy_route_lib_to_tester_charm():
 
 @pytest.fixture(scope="session", autouse=True)
 def copy_ingress_lib_to_tester_charm():
-    library_path = "lib/charms/traefik_k8s/v0/ingress_per_unit.py"
+    library_path = "lib/charms/traefik_k8s/v1/ingress_per_unit.py"
     install_path = f"tests/integration/ingress-requirer-mock/{library_path}"
     shutil.copyfile(library_path, install_path)
     yield
