@@ -37,13 +37,13 @@ class SomeCharm(CharmBase):
     # The following event is triggered when the ingress URL to be used
     # by this unit of `SomeCharm` is ready (or changes).
     self.framework.observe(
-        self.ingress_per_unit.on.ready_for_unit, self._on_ingress_data_provided
+        self.ingress_per_unit.on.ready_for_unit, self._on_ingress_ready
     )
     self.framework.observe(
         self.ingress_per_unit.on.revoked_for_unit, self._on_ingress_revoked
     )
 
-    def _on_ingress_data_provided(self, event: IngressPerUnitReadyForUnitEvent):
+    def _on_ingress_ready(self, event: IngressPerUnitReadyForUnitEvent):
         # event.url is the same as self.ingress_per_unit.url
         logger.info("This unit's ingress URL: %s", event.url)
 
@@ -82,7 +82,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 6
 
 log = logging.getLogger(__name__)
 
@@ -112,6 +112,7 @@ INGRESS_REQUIRES_UNIT_SCHEMA = {
         "host": {"type": "string"},
         "port": {"type": "string"},
         "mode": {"type": "string"},
+        "strip-prefix": {"type": "string"},
     },
     "required": ["model", "name", "host", "port"],
 }
@@ -150,6 +151,7 @@ RequirerData = TypedDict(
         "host": str,
         "port": int,
         "mode": Optional[Literal["tcp", "http"]],
+        "strip-prefix": Optional[bool],
     },
     total=False,
 )
@@ -470,21 +472,25 @@ class IngressPerUnitProvider(_IngressPerUnitBase):
         return requirer_units_data
 
     def _get_requirer_unit_data(self, relation: Relation, remote_unit: Unit) -> RequirerData:  # type: ignore
-        """Attempts to fetch the requirer unit data for this unit.
+        """Fetch and validate the requirer unit data for this unit.
 
-        May raise KeyError if the remote unit didn't send (some of) the required
-        data yet, or ValidationError if it did share some data, but the data
-        is invalid.
+        For convenience, we convert 'port' to integer.
         """
+        if not relation.app or not relation.app.name:
+            # Handle edge case where remote app name can be missing, e.g.,
+            # relation_broken events.
+            # FIXME https://github.com/canonical/traefik-k8s-operator/issues/34
+            return {}
+
         databag = relation.data[remote_unit]
         remote_data = {}  # type: Dict[str, Union[int, str]]
-        for k in ("port", "host", "model", "name", "mode"):
+        for k in ("port", "host", "model", "name", "mode", "strip-prefix"):
             v = databag.get(k)
             if v is not None:
                 remote_data[k] = v
         _validate_data(remote_data, INGRESS_REQUIRES_UNIT_SCHEMA)
-        # do some convenience casting
         remote_data["port"] = int(remote_data["port"])
+        remote_data["strip-prefix"] = bool(remote_data.get("strip-prefix", False))
         return remote_data
 
     def _provider_app_data(self, relation: Relation) -> ProviderApplicationData:
@@ -653,6 +659,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         port: Optional[int] = None,
         mode: Literal["tcp", "http"] = "http",
         listen_to: Literal["only-this-unit", "all-units", "both"] = "only-this-unit",
+        strip_prefix: bool = False,
     ):
         """Constructor for IngressPerUnitRequirer.
 
@@ -688,6 +695,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         self._host = host
         self._port = port
         self._mode = mode
+        self._strip_prefix = strip_prefix
 
         self.listen_to = listen_to
 
@@ -703,7 +711,7 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         # before and those we know now
         previous_urls = self._stored.current_urls or {}  # type: ignore
         current_urls = (
-            {} if isinstance(event, RelationBrokenEvent) else self.urls
+            {} if isinstance(event, RelationBrokenEvent) else self._urls_from_relation_data
         )
         self._stored.current_urls = current_urls  # type: ignore
 
@@ -729,14 +737,13 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             for unit_name in removed:
                 self.on.revoked.emit(self.relation, unit_name)  # type: ignore
 
-        # todo remove cast when ops.charm is typed
-        self._publish_auto_data(typing.cast(Relation, event.relation))
+        self._publish_auto_data()
 
     def _handle_upgrade_or_leader(self, event):
-        for relation in self.relations:
-            self._publish_auto_data(relation)
+        if self.relations:
+            self._publish_auto_data()
 
-    def _publish_auto_data(self, relation: Relation):
+    def _publish_auto_data(self):
         if self._port:
             self.provide_ingress_requirements(host=self._host, port=self._port)
 
@@ -777,11 +784,15 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
             "port": str(port),
             "mode": self._mode,
         }
+
+        if self._strip_prefix:
+            data["strip-prefix"] = "true"
+
         _validate_data(data, INGRESS_REQUIRES_UNIT_SCHEMA)
         self.relation.data[self.unit].update(data)
 
     @property
-    def urls(self) -> Dict[str, str]:
+    def _urls_from_relation_data(self) -> Dict[str, str]:
         """The full ingress URLs to reach every unit.
 
         May return an empty dict if the URLs aren't available yet.
@@ -815,11 +826,21 @@ class IngressPerUnitRequirer(_IngressPerUnitBase):
         return {unit_name: unit_data["url"] for unit_name, unit_data in data.items()}
 
     @property
+    def urls(self) -> Dict[str, str]:
+        """The full ingress URLs to reach every unit.
+
+        May return an empty dict if the URLs aren't available yet.
+        """
+        current_urls = self._urls_from_relation_data
+        return current_urls
+
+    @property
     def url(self) -> Optional[str]:
         """The full ingress URL to reach the current unit.
 
         May return None if the URL isn't available yet.
         """
-        if not self.urls:
+        urls = self.urls
+        if not urls:
             return None
-        return self.urls.get(self.charm.unit.name)
+        return urls.get(self.charm.unit.name)
