@@ -117,13 +117,13 @@ class TraefikRouteRequirerEvents(CharmEvents):
     """Container for TraefikRouteRequirer events."""
 
     ready = EventSource(TraefikRouteRequirerReadyEvent)
-    revoked = EventSource(TraefikRouteProviderRevokedEvent)
 
 
 class TraefikRouteProviderEvents(CharmEvents):
     """Container for TraefikRouteProvider events."""
 
-    ready = EventSource(TraefikRouteProviderReadyEvent)
+    ready = EventSource(TraefikRouteProviderReadyEvent)  # TODO rename to data_provided in v1
+    data_removed = EventSource(TraefikRouteProviderRevokedEvent)
 
 
 class TraefikRouteProvider(Object):
@@ -197,7 +197,7 @@ class TraefikRouteProvider(Object):
             self.on.ready.emit(event.relation)
 
     def _on_relation_broken(self, event: RelationEvent):
-        self.on.revoked.emit(event.relation)
+        self.on.data_removed.emit(event.relation)
 
     def _update_requirers_with_external_host(self):
         """Ensure that requirers know the external host for Traefik."""
