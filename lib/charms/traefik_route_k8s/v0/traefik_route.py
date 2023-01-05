@@ -105,7 +105,7 @@ class TraefikRouteProviderReadyEvent(RelationEvent):
     """Event emitted when Traefik is ready to provide ingress for a routed unit."""
 
 
-class TraefikRouteProviderRevokedEvent(RelationEvent):
+class TraefikRouteProviderDataRemovedEvent(RelationEvent):
     """Event emitted when a routed ingress relation is removed."""
 
 
@@ -123,7 +123,7 @@ class TraefikRouteProviderEvents(CharmEvents):
     """Container for TraefikRouteProvider events."""
 
     ready = EventSource(TraefikRouteProviderReadyEvent)  # TODO rename to data_provided in v1
-    data_removed = EventSource(TraefikRouteProviderRevokedEvent)
+    data_removed = EventSource(TraefikRouteProviderDataRemovedEvent)
 
 
 class TraefikRouteProvider(Object):
