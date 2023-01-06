@@ -5,7 +5,6 @@
 import textwrap
 import unittest
 
-import ops
 from charms.harness_extensions.v0.capture_events import capture
 from charms.traefik_route_k8s.v0.traefik_route import (
     TraefikRouteProvider,
@@ -14,8 +13,6 @@ from charms.traefik_route_k8s.v0.traefik_route import (
 )
 from ops.charm import CharmBase
 from ops.testing import Harness
-
-ops.testing.SIMULATE_CAN_CONNECT = True
 
 
 class DummyProviderCharm(CharmBase):
