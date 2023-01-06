@@ -149,6 +149,7 @@ class TraefikRouteProvider(Object):
             charm: The charm that is instantiating the instance.
             relation_name: The name of the relation relation_name to bind to
                 (defaults to "traefik-route").
+            external_host: The external host.
         """
         super().__init__(charm, relation_name)
         self._stored.set_default(external_host=None)
@@ -181,7 +182,8 @@ class TraefikRouteProvider(Object):
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
         app data ensures that only the previous leader will know what it is. Separating it
         allows for re-use both when the property is called and if the relation changes, so a
-        leader change where the new leader checks the property will do the right thing."""
+        leader change where the new leader checks the property will do the right thing.
+        """
         if self._charm.unit.is_leader():
             for relation in self._charm.model.relations[self._relation_name]:
                 if not relation.app:
@@ -209,7 +211,10 @@ class TraefikRouteProvider(Object):
 
     @staticmethod
     def is_ready(relation: Relation) -> bool:
-        """Whether TraefikRoute is ready on this relation: i.e. the remote app shared the config."""
+        """Whether TraefikRoute is ready on this relation.
+
+        Returns True when the remote app shared the config; False otherwise.
+        """
         return "config" in relation.data[relation.app]
 
     @staticmethod
@@ -263,7 +268,8 @@ class TraefikRouteRequirer(Object):
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
         app data ensures that only the previous leader will know what it is. Separating it
         allows for re-use both when the property is called and if the relation changes, so a
-        leader change where the new leader checks the property will do the right thing."""
+        leader change where the new leader checks the property will do the right thing.
+        """
         if self._charm.unit.is_leader():
             if self._relation:
                 for relation in self._charm.model.relations[self._relation.name]:
