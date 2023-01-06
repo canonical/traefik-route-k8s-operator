@@ -6,11 +6,14 @@ import textwrap
 import unittest
 
 import ops
-from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteProvider, TraefikRouteProviderReadyEvent, TraefikRouteProviderDataRemovedEvent
-from ops.charm import CharmBase
-from ops.framework import StoredState
-from ops.testing import Harness
 from charms.harness_extensions.v0.capture_events import capture
+from charms.traefik_route_k8s.v0.traefik_route import (
+    TraefikRouteProvider,
+    TraefikRouteProviderDataRemovedEvent,
+    TraefikRouteProviderReadyEvent,
+)
+from ops.charm import CharmBase
+from ops.testing import Harness
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
