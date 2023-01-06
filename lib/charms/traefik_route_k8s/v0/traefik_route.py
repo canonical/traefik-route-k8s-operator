@@ -105,6 +105,10 @@ class TraefikRouteProviderReadyEvent(RelationEvent):
     """Event emitted when Traefik is ready to provide ingress for a routed unit."""
 
 
+class TraefikRouteProviderDataRemovedEvent(RelationEvent):
+    """Event emitted when a routed ingress relation is removed."""
+
+
 class TraefikRouteRequirerReadyEvent(RelationEvent):
     """Event emitted when a unit requesting ingress has provided all data Traefik needs."""
 
@@ -118,7 +122,8 @@ class TraefikRouteRequirerEvents(CharmEvents):
 class TraefikRouteProviderEvents(CharmEvents):
     """Container for TraefikRouteProvider events."""
 
-    ready = EventSource(TraefikRouteProviderReadyEvent)
+    ready = EventSource(TraefikRouteProviderReadyEvent)  # TODO rename to data_provided in v1
+    data_removed = EventSource(TraefikRouteProviderDataRemovedEvent)
 
 
 class TraefikRouteProvider(Object):
@@ -159,6 +164,9 @@ class TraefikRouteProvider(Object):
         self.framework.observe(
             self._charm.on[relation_name].relation_changed, self._on_relation_changed
         )
+        self.framework.observe(
+            self._charm.on[relation_name].relation_broken, self._on_relation_broken
+        )
 
     @property
     def external_host(self) -> str:
@@ -187,6 +195,9 @@ class TraefikRouteProvider(Object):
             # todo check data is valid here?
             self._update_requirers_with_external_host()
             self.on.ready.emit(event.relation)
+
+    def _on_relation_broken(self, event: RelationEvent):
+        self.on.data_removed.emit(event.relation)
 
     def _update_requirers_with_external_host(self):
         """Ensure that requirers know the external host for Traefik."""
