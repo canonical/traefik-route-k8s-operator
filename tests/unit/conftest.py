@@ -27,7 +27,7 @@ SAMPLE_TRAEFIK_DATA_ENCODED = {"ingress": json.dumps(SAMPLE_TRAEFIK_DATA)}
 
 
 @pytest.fixture
-def harness() -> Harness[TraefikRouteK8SCharm]:
+def harness() -> Harness[TraefikRouteK8SCharm]:  # type: ignore
     harness = Harness(TraefikRouteK8SCharm)
     harness.set_leader(True)
     # this charm can't be scaled, so we won't ever need leadership checks

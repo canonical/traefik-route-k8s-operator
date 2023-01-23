@@ -69,7 +69,7 @@ class RouteConfig:
 @dataclass
 class _RouteConfig:
     root_url: str
-    rule: str = None
+    rule: Optional[str] = None
 
     @property
     def is_valid(self):
@@ -120,7 +120,7 @@ class _RouteConfig:
                     juju_model=model_name, juju_application=app_name, juju_unit=unit_name
                 )
             except jinja2.UndefinedError as e:
-                undefined_key = e.message.split()[0].strip(r"'")
+                undefined_key = e.message.split()[0].strip(r"'")  # type: ignore
                 raise TemplateKeyError(obj, undefined_key) from e
 
         url = _render(self.root_url)
@@ -158,7 +158,7 @@ class TraefikRouteK8SCharm(CharmBase):
 
         self.ingress_per_unit = IngressPerUnitProvider(self, self._ingress_relation_name)
         self.traefik_route = TraefikRouteRequirer(
-            self, self._traefik_route_relation, self._traefik_route_relation_name
+            self, self._traefik_route_relation, self._traefik_route_relation_name  # type: ignore
         )
 
         observe = self.framework.observe
@@ -197,7 +197,7 @@ class TraefikRouteK8SCharm(CharmBase):
         return self._get_relation(self._traefik_route_relation_name)
 
     @property
-    def _remote_routed_units(self) -> Tuple[Unit]:
+    def _remote_routed_units(self) -> Tuple[Unit, ...]:
         """The remote units in need of ingress."""
         return self._get_remote_units_from_relation(self._ipu_relation)
 
@@ -215,7 +215,7 @@ class TraefikRouteK8SCharm(CharmBase):
 
     @property
     def _config(self) -> _RouteConfig:
-        return _RouteConfig(rule=self.config.get("rule"), root_url=self.config.get("root_url"))
+        return _RouteConfig(rule=self.config.get("rule"), root_url=self.config.get("root_url"))  # type: ignore
 
     @property
     def rule(self) -> Optional[str]:
@@ -313,9 +313,9 @@ class TraefikRouteK8SCharm(CharmBase):
         relation = self._ipu_relation
 
         unit_configs = []
-        ready_units = filter(lambda unit_: ingress.is_unit_ready(relation, unit_), relation.units)
+        ready_units = filter(lambda unit_: ingress.is_unit_ready(relation, unit_), relation.units)  # type: ignore
         for unit in ready_units:  # units requesting ingress
-            unit_data = ingress.get_data(self._ipu_relation, unit)
+            unit_data = ingress.get_data(self._ipu_relation, unit)  # type: ignore
             config_data = self._config_for_unit(unit_data)
             unit_config = self._generate_traefik_unit_config(config_data)
             unit_configs.append(unit_config)
@@ -325,7 +325,7 @@ class TraefikRouteK8SCharm(CharmBase):
             # tell us the url, but Traefik needs the config before it can start routing.
             # To be reconsidered if this leads to too much outage or bugs downstream.
             logger.info(f"publishing to {unit_data['name']}: {config_data.root_url}")
-            ingress.publish_url(relation, unit_data["name"], config_data.root_url)
+            ingress.publish_url(relation, unit_data["name"], config_data.root_url)  # type: ignore
 
         # merge configs?
         config = self._merge_traefik_configs(unit_configs)
@@ -359,7 +359,7 @@ class TraefikRouteK8SCharm(CharmBase):
                 "services": {config["service_name"]: config["service"] for config in configs},
             }
         }
-        return traefik_config
+        return traefik_config  # type: ignore
 
 
 if __name__ == "__main__":
