@@ -44,8 +44,8 @@ class UnitConfig(TypedDict):  # noqa: D101
 
 
 class Http(TypedDict):  # noqa: D101
-    routers: Mapping[RouterName, Router]
-    services: Mapping[ServiceName, Router]
+    routers: Mapping[RouterName, Router]  # type: ignore
+    services: Mapping[ServiceName, Router]  # type: ignore
 
 
 class TraefikConfig(TypedDict):  # noqa: D101

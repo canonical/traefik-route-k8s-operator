@@ -39,6 +39,8 @@ EXPECTED_TRAEFIK_CONFIG = {
 def test_baseline(harness: Harness[TraefikRouteK8SCharm]):
     charm = harness.charm
 
+    assert charm is not None  # for static checks
+
     assert not charm._config.is_valid, "default config is not OK"
     assert isinstance(charm.unit.status, BlockedStatus)
 
@@ -51,6 +53,7 @@ def test_baseline(harness: Harness[TraefikRouteK8SCharm]):
 
 def test_blocked_status_on_default_config_changed(harness: Harness[TraefikRouteK8SCharm]):
     charm = harness.charm
+    assert charm is not None  # for static checks
     assert not charm._config.is_valid
     charm._on_config_changed(None)
     assert isinstance(charm.unit.status, BlockedStatus)
@@ -69,18 +72,22 @@ def test_blocked_status_on_default_config_changed(harness: Harness[TraefikRouteK
 )
 def test_config_validity(harness: Harness[TraefikRouteK8SCharm], config: dict, valid: bool):
     harness.update_config(config)
-    assert harness.charm._config.is_valid == valid
-    assert harness.charm._is_configuration_valid == valid
+    charm = harness.charm
+    assert charm is not None  # for static checks
+    assert charm._config.is_valid == valid
+    assert charm._is_configuration_valid == valid
 
 
 def test_blocked_status_on_bad_config(harness: Harness[TraefikRouteK8SCharm]):
     charm = harness.charm
+    assert charm is not None  # for static checks
     harness.update_config({"root_url": " ! "})
     assert isinstance(charm.unit.status, BlockedStatus)
 
 
 def test_active_status_on_good_config(harness: Harness[TraefikRouteK8SCharm]):
     charm = harness.charm
+    assert charm is not None  # for static checks
     mock_config(harness)  # this will call on_config_changed
     assert charm._config.is_valid
     assert charm._is_configuration_valid
@@ -92,12 +99,14 @@ def test_ingress_request_relaying_preconditions(harness: Harness[TraefikRouteK8S
     """Check that in happy-path scenario all is set up for relaying."""
     ipu_relation_id, route_relation_id = mock_happy_path(harness)
     charm = harness.charm
+    assert charm is not None  # for static checks
 
     assert charm.unit.is_leader()
     assert (ipu_relation := charm._ipu_relation)
     assert not charm.ingress_per_unit.is_ready(ipu_relation)  # nothing's been shared yet
 
     tr_relation = charm.traefik_route._relation
+    assert tr_relation.app is not None  # for static checks
     assert tr_relation.data[tr_relation.app] == {}
 
     assert isinstance(charm.unit.status, BlockedStatus)
@@ -107,6 +116,7 @@ def test_on_ingress_request_called(harness: Harness[TraefikRouteK8SCharm]):
     """Test that _on_ingress_data_provided is being called on ipu relation change."""
     ipu_relation_id, route_relation_id = mock_happy_path(harness)
     charm = harness.charm
+    assert charm is not None  # for static checks
 
     # check that _on_ingress_data_provided would have been called
     with capture(charm, IngressDataReadyEvent):
@@ -126,9 +136,10 @@ def test_ingress_submit_to_traefik_called(harness: Harness[TraefikRouteK8SCharm]
     """
     ipu_relation_id, route_relation_id = mock_happy_path(harness)
     charm = harness.charm
+    assert charm is not None  # for static checks
 
     # check that submit_to_traefik would have been called
-    charm.traefik_route.submit_to_traefik = Mock(return_value=None)
+    charm.traefik_route.submit_to_traefik = Mock(return_value=None)  # type: ignore
 
     harness.update_relation_data(ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA)
     charm.traefik_route.submit_to_traefik.assert_called_with(config=EXPECTED_TRAEFIK_CONFIG)
@@ -142,6 +153,7 @@ def test_ingress_request_forwarding_data(harness: Harness[TraefikRouteK8SCharm])
     """
     ipu_relation_id, route_relation_id = mock_happy_path(harness)
     charm = harness.charm
+    assert charm is not None  # for static checks
 
     # remote app requesting ingress: publish ingress data
     harness.update_relation_data(ipu_relation_id, REMOTE_UNIT_NAME, SAMPLE_INGRESS_DATA)

@@ -52,10 +52,10 @@ class TestProviderEvents(unittest.TestCase):
     def test_custom_event_emitted_when_related(self):
         app = "trfk-rt"
         rel_id = self._relate_to_consumer(app)
-        with capture(self.harness.charm, TraefikRouteProviderReadyEvent):
+        with capture(self.harness.charm, TraefikRouteProviderReadyEvent):  # type: ignore
             self.harness.update_relation_data(rel_id, app, {"config": "blob"})
 
     def test_custom_event_emitted_when_relation_removed(self):
         rel_id = self._relate_to_consumer()
-        with capture(self.harness.charm, TraefikRouteProviderDataRemovedEvent):
+        with capture(self.harness.charm, TraefikRouteProviderDataRemovedEvent):  # type: ignore
             self.harness.remove_relation(rel_id)
