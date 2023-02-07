@@ -1,5 +1,10 @@
 # traefik-route-k8s-operator
 
+[![CharmHub Badge](https://charmhub.io/traefik-route-k8s/badge.svg)](https://charmhub.io/traefik-route-k8s)
+[![Release Edge](https://github.com/canonical/traefik-route-k8s-operator/actions/workflows/release-edge.yaml/badge.svg)](https://github.com/canonical/traefik-route-k8s-operator/actions/workflows/release-edge.yaml)
+[![Release Libraries](https://github.com/canonical/traefik-route-k8s-operator/actions/workflows/release-libs.yaml/badge.svg)](https://github.com/canonical/traefik-route-k8s-operator/actions/workflows/release-libs.yaml)
+[![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
+
 ## Description
 
 Traefik-route-k8s provides separation of concerns between the general needs of 
