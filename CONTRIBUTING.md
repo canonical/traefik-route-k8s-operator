@@ -1,5 +1,13 @@
 # traefik-route-k8s-operator
 
+![GitHub License](https://img.shields.io/github/license/canonical/traefik-route-k8s-operator)
+![GitHub Commit Activity](https://img.shields.io/github/commit-activity/y/canonical/traefik-route-k8s-operator)
+![GitHub Lines of Code](https://img.shields.io/tokei/lines/github/canonical/traefik-route-k8s-operator)
+![GitHub Issues](https://img.shields.io/github/issues/canonical/traefik-route-k8s-operator)
+![GitHub PRs](https://img.shields.io/github/issues-pr/canonical/traefik-route-k8s-operator)
+![GitHub Contributors](https://img.shields.io/github/contributors/canonical/traefik-route-k8s-operator)
+![GitHub Watchers](https://img.shields.io/github/watchers/canonical/traefik-route-k8s-operator?style=social)
+
 ## Developing
 
 Create and activate a virtualenv with the development requirements:
