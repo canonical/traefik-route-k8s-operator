@@ -5,12 +5,12 @@ from unittest.mock import Mock
 
 import pytest
 import yaml
+from charm import TraefikRouteK8SCharm
 from charms.harness_extensions.v0.capture_events import capture
 from charms.traefik_k8s.v1.ingress_per_unit import IngressDataReadyEvent
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 
-from charm import TraefikRouteK8SCharm
 from tests.unit.conftest import (
     REMOTE_UNIT_NAME,
     SAMPLE_INGRESS_DATA,

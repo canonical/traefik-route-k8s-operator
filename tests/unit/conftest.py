@@ -4,10 +4,9 @@
 import json
 
 import pytest as pytest
+from charm import TraefikRouteK8SCharm
 from ops import framework, storage
 from ops.testing import Harness
-
-from charm import TraefikRouteK8SCharm
 
 MODEL_NAME = "model"
 REMOTE_APP_NAME = "remote"  # the app requesting ingress

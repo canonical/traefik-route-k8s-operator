@@ -21,7 +21,6 @@ from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit
-
 from types_ import TraefikConfig, UnitConfig
 
 logger = logging.getLogger(__name__)
@@ -259,7 +258,7 @@ class TraefikRouteK8SCharm(CharmBase):
         if not ipu_relation:
             self.unit.status = BlockedStatus("Awaiting to be related via ingress-per-unit.")
             return False
-        elif not self.ingress_per_unit.is_ready(ipu_relation):
+        if not self.ingress_per_unit.is_ready(ipu_relation):
             self.unit.status = BlockedStatus("ingress-per-unit relation is not ready.")
             return False
 
@@ -286,6 +285,7 @@ class TraefikRouteK8SCharm(CharmBase):
         )
         self._update()
         self.unit.status = ActiveStatus()
+        return None
 
     def _config_for_unit(self, unit_data: RequirerData) -> RouteConfig:
         """Get the _RouteConfig for the provided `unit_data`."""
