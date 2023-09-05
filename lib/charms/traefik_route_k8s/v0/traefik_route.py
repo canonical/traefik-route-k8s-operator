@@ -192,7 +192,7 @@ class TraefikRouteProvider(Object):
         return list(self._charm.model.relations[self._relation_name])
 
     def _update_stored(self) -> None:
-        """Ensure that the stored host is up-to-date.
+        """Ensure that the stored data is up-to-date.
 
         This is split out into a separate method since, in the case of multi-unit deployments,
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
