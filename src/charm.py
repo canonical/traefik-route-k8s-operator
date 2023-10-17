@@ -162,7 +162,10 @@ class TraefikRouteK8SCharm(CharmBase):
 
         observe = self.framework.observe
         observe(self.on.config_changed, self._on_config_changed)
-        observe(self.ingress_per_unit.on.data_provided, self._on_ingress_data_provided)
+        observe(
+            self.ingress_per_unit.on.data_provided,  # pyright: ignore
+            self._on_ingress_data_provided,
+        )
 
         # todo wipe all data if and when TR 'stops' being ready
         #  (e.g. config change breaks the config)
@@ -292,8 +295,8 @@ class TraefikRouteK8SCharm(CharmBase):
         # we assume self.ingress_request is there; if not, you should probably
         # put this codepath behind:
         #   if self._is_ready()...
-        unit_name = unit_data["name"]
-        model_name = unit_data["model"]
+        unit_name = unit_data["name"]  # pyright: ignore
+        model_name = unit_data["model"]  # pyright: ignore
 
         # sanity checks
         assert unit_name is not None, "remote unit did not provide its name"
@@ -324,7 +327,9 @@ class TraefikRouteK8SCharm(CharmBase):
             # with traefik loading the config. Point is, we don't need Traefik to
             # tell us the url, but Traefik needs the config before it can start routing.
             # To be reconsidered if this leads to too much outage or bugs downstream.
-            logger.info(f"publishing to {unit_data['name']}: {config_data.root_url}")
+            logger.info(
+                f"publishing to {unit_data['name']}: {config_data.root_url}"  # pyright: ignore
+            )
             ingress.publish_url(relation, unit_data["name"], config_data.root_url)  # type: ignore
 
         # merge configs?
@@ -333,8 +338,8 @@ class TraefikRouteK8SCharm(CharmBase):
             self.traefik_route.submit_to_traefik(config=config)
 
     @staticmethod
-    def _generate_traefik_unit_config(config: RouteConfig) -> "UnitConfig":
-        rule, config_id, url = config.rule, config.id_, config.root_url
+    def _generate_traefik_unit_config(route_config: RouteConfig) -> "UnitConfig":
+        rule, config_id, url = route_config.rule, route_config.id_, route_config.root_url
 
         traefik_router_name = f"juju-{config_id}-router"
         traefik_service_name = f"juju-{config_id}-service"
