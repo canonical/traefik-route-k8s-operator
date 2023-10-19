@@ -200,7 +200,7 @@ class TraefikRouteProvider(Object):
         This is split out into a separate method since, in the case of multi-unit deployments,
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
         app data ensures that only the previous leader will know what it is. Separating it
-        allows for re-use both when the property is called and if the relation changes, so a
+        allows for reuse both when the property is called and if the relation changes, so a
         leader change where the new leader checks the property will do the right thing.
         """
         if not self._charm.unit.is_leader():
@@ -309,7 +309,7 @@ class TraefikRouteRequirer(Object):
         This is split out into a separate method since, in the case of multi-unit deployments,
         removal of a `TraefikRouteRequirer` will not cause a `RelationEvent`, but the guard on
         app data ensures that only the previous leader will know what it is. Separating it
-        allows for re-use both when the property is called and if the relation changes, so a
+        allows for reuse both when the property is called and if the relation changes, so a
         leader change where the new leader checks the property will do the right thing.
         """
         if not self._charm.unit.is_leader():
