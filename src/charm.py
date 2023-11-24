@@ -8,7 +8,7 @@ import logging
 import textwrap
 from dataclasses import dataclass
 from itertools import starmap
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple, cast
 from urllib.parse import urlparse
 
 import jinja2
@@ -62,7 +62,8 @@ class RouteConfig:
 
     root_url: str
     rule: str
-    id_: str
+    service_name: str
+    strip_prefix: bool = False
 
 
 @dataclass
@@ -107,7 +108,7 @@ class _RouteConfig:
         valid = starmap(_check_var, ((self.rule, "rule"), (self.root_url, "root_url")))
         return all(valid)
 
-    def render(self, model_name: str, unit_name: str, app_name: str):
+    def render(self, model_name: str, unit_name: str, app_name: str, strip_prefix: bool = False):
         """Fills in the blanks in the templates."""
 
         def _render(obj: str):
@@ -129,8 +130,10 @@ class _RouteConfig:
             rule = _render(self.rule)
 
         # an easily recognizable id for the traefik services
-        id_ = "-".join((unit_name, model_name))
-        return RouteConfig(rule=rule, root_url=url, id_=id_)
+        service_name = "-".join((unit_name, model_name))
+        return RouteConfig(
+            rule=rule, root_url=url, service_name=service_name, strip_prefix=strip_prefix
+        )
 
     @staticmethod
     def generate_rule_from_url(url) -> str:
@@ -229,8 +232,15 @@ class TraefikRouteK8SCharm(CharmBase):
         """The advertised url for the charm requesting ingress."""
         return self._config.root_url
 
-    def _render_config(self, model_name: str, unit_name: str, app_name: str):
-        return self._config.render(model_name=model_name, unit_name=unit_name, app_name=app_name)
+    def _render_config(
+        self, model_name: str, unit_name: str, app_name: str, strip_prefix: bool = False
+    ):
+        return self._config.render(
+            model_name=model_name,
+            unit_name=unit_name,
+            app_name=app_name,
+            strip_prefix=strip_prefix,
+        )
 
     def _on_config_changed(self, _):
         """Check the config; set an active status if all is good."""
@@ -297,6 +307,7 @@ class TraefikRouteK8SCharm(CharmBase):
         #   if self._is_ready()...
         unit_name = unit_data["name"]  # pyright: ignore
         model_name = unit_data["model"]  # pyright: ignore
+        strip_prefix = unit_data["strip-prefix"]  # pyright: ignore
 
         # sanity checks
         assert unit_name is not None, "remote unit did not provide its name"
@@ -304,6 +315,7 @@ class TraefikRouteK8SCharm(CharmBase):
 
         return self._render_config(
             model_name=model_name,
+            strip_prefix=strip_prefix,
             unit_name=unit_name.replace("/", "-"),
             app_name=unit_name.split("/")[0],
         )
@@ -339,12 +351,16 @@ class TraefikRouteK8SCharm(CharmBase):
 
     @staticmethod
     def _generate_traefik_unit_config(route_config: RouteConfig) -> "UnitConfig":
-        rule, config_id, url = route_config.rule, route_config.id_, route_config.root_url
+        rule, service_name, url = (
+            route_config.rule,
+            route_config.service_name,
+            route_config.root_url,
+        )
 
-        traefik_router_name = f"juju-{config_id}-router"
-        traefik_service_name = f"juju-{config_id}-service"
+        traefik_router_name = f"juju-{service_name}-router"
+        traefik_service_name = f"juju-{service_name}-service"
 
-        config: "UnitConfig" = {
+        config = {
             "router": {
                 "rule": rule,
                 "service": traefik_service_name,
@@ -354,16 +370,30 @@ class TraefikRouteK8SCharm(CharmBase):
             "service": {"loadBalancer": {"servers": [{"url": url}]}},
             "service_name": traefik_service_name,
         }
-        return config
+
+        if route_config.strip_prefix:
+            traefik_middleware_name = f"juju-sidecar-noprefix-{service_name}-service"
+            config["middleware_name"] = traefik_middleware_name
+            config["middleware"] = {"forceSlash": False, "prefixes": [f"/{service_name}"]}
+
+        return cast("UnitConfig", config)
 
     @staticmethod
     def _merge_traefik_configs(configs: Iterable["UnitConfig"]) -> "TraefikConfig":
+        middlewares = {
+            config.get("middleware_name"): config.get("middleware")
+            for config in configs
+            if config.get("middleware")
+        }
         traefik_config = {
             "http": {
                 "routers": {config["router_name"]: config["router"] for config in configs},
                 "services": {config["service_name"]: config["service"] for config in configs},
             }
         }
+        if middlewares:
+            traefik_config["http"]["middlewares"] = middlewares
+
         return traefik_config  # type: ignore
 
 
