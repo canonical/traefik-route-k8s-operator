@@ -4,7 +4,7 @@
 
 """Types for TraefikRoute charm."""
 
-from typing import List, Mapping
+from typing import List, Mapping, Optional
 
 try:
     from typing import TypedDict
@@ -36,11 +36,22 @@ class Service(TypedDict):  # noqa: D101
     loadBalancer: Servers  # noqa N815
 
 
+class StripPrefixMiddleware(TypedDict):  # noqa: D101
+    forceSlash: bool  # noqa N815
+    prefixes: List[str]
+
+
+class Middleware(TypedDict):  # noqa: D101
+    stripPrefix: StripPrefixMiddleware  # noqa N815
+
+
 class UnitConfig(TypedDict):  # noqa: D101
     router_name: str
     router: Router
     service_name: str
     service: Service
+    middleware_name: Optional[str]
+    middleware: Optional[Middleware]
 
 
 class Http(TypedDict):  # noqa: D101
