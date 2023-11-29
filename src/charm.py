@@ -307,7 +307,7 @@ class TraefikRouteK8SCharm(CharmBase):
         #   if self._is_ready()...
         unit_name = unit_data["name"]  # pyright: ignore
         model_name = unit_data["model"]  # pyright: ignore
-        strip_prefix = unit_data["strip-prefix"]  # pyright: ignore
+        strip_prefix = bool(unit_data.get("strip-prefix", None))
 
         # sanity checks
         assert unit_name is not None, "remote unit did not provide its name"
