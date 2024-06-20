@@ -73,7 +73,7 @@ class TraefikRouteCharm(CharmBase):
 ```
 """
 import logging
-from typing import Optional
+from typing import Optional, cast
 
 import yaml
 from ops.charm import CharmBase, CharmEvents, RelationEvent
@@ -99,6 +99,10 @@ class TraefikRouteException(RuntimeError):
 
 class UnauthorizedError(TraefikRouteException):
     """Raised when the unit needs leadership to perform some action."""
+
+
+class NotReadyError(TraefikRouteException):
+    """Raised when the endpoint isn't ready to perform the requested action."""
 
 
 class TraefikRouteProviderReadyEvent(RelationEvent):
@@ -355,7 +359,10 @@ class TraefikRouteRequirer(Object):
         if not self._charm.unit.is_leader():
             raise UnauthorizedError()
 
-        app_databag = self._relation.data[self._charm.app]
+        if not self.is_ready():
+            raise NotReadyError()
+
+        app_databag = cast(Relation, self._relation).data[self._charm.app]
 
         # Traefik thrives on yaml, feels pointless to talk json to Route
         app_databag["config"] = yaml.safe_dump(config)
