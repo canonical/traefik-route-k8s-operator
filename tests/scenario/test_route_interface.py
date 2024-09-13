@@ -1,7 +1,8 @@
 import pytest
 import yaml
-from charm import TraefikRouteK8SCharm
 from scenario import Context, Relation, State
+
+from charm import TraefikRouteK8SCharm
 
 
 @pytest.fixture
