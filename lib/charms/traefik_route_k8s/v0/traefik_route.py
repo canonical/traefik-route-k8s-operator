@@ -358,7 +358,7 @@ class TraefikRouteRequirer(Object):
         """Is the TraefikRouteRequirer ready to submit data to Traefik?"""
         return self._relation is not None
 
-    def submit_to_traefik(self, config: dict, static: dict = None):
+    def submit_to_traefik(self, config: dict, static: Optional[dict] = None):
         """Relay an ingress configuration data structure to traefik.
 
         This will publish to the traefik-route relation databag
