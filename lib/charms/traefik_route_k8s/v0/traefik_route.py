@@ -6,9 +6,9 @@ r"""# [DEPRECATED!] Interface Library for traefik_route.
 
 This is a DEPRECATED version of the traefik_route interface library.
 
-It was dropped and no longer maintained by `traefik-route-k8s-operator`, which will soon be archived.
+It was dropped and no longer maintained under `traefik-route-k8s-operator`, which will soon be archived.
 
-traefik_route v0 is now maintained by `traefik-k8s-operator`.
+traefik_route v0 is now maintained under `traefik-k8s-operator`.
 
 Please import with `charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route`.
 
@@ -100,8 +100,8 @@ class TraefikRouteProvider(Object):
         """
         log.warning(
             "The ``traefik_route v0`` library is DEPRECATED "
-            "and no longer maintained by ``traefik-route-k8s-operator``. "
-            "``traefik_route v0`` is now maintained by ``traefik-k8s-operator``. "
+            "and no longer maintained under ``traefik-route-k8s-operator``. "
+            "``traefik_route v0`` is now maintained under ``traefik-k8s-operator``. "
             "Please import with ``charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route``."
         )
         super().__init__(charm, relation_name)
@@ -241,8 +241,8 @@ class TraefikRouteRequirer(Object):
     def __init__(self, charm: CharmBase, relation: Relation, relation_name: str = "traefik-route"):
         log.warning(
             "The ``traefik_route v0`` library is DEPRECATED "
-            "and no longer maintained by ``traefik-route-k8s-operator``. "
-            "``traefik_route v0`` is now maintained by ``traefik-k8s-operator``. "
+            "and no longer maintained under ``traefik-route-k8s-operator``. "
+            "``traefik_route v0`` is now maintained under ``traefik-k8s-operator``. "
             "Please import with ``charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route``."
         )
         super(TraefikRouteRequirer, self).__init__(charm, relation_name)
