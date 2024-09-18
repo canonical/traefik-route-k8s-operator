@@ -10,7 +10,7 @@ It was dropped and no longer maintained under `traefik-route-k8s-operator`, whic
 
 traefik_route v0 is now maintained under `traefik-k8s-operator`.
 
-Please import with `charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route`.
+Please fetch the new library with `charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route`.
 
 """
 import logging
@@ -102,7 +102,7 @@ class TraefikRouteProvider(Object):
             "The ``traefik_route v0`` library is DEPRECATED "
             "and no longer maintained under ``traefik-route-k8s-operator``. "
             "``traefik_route v0`` is now maintained under ``traefik-k8s-operator``. "
-            "Please import with ``charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route``."
+            "Please fetch the new library with ``charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route``."
         )
         super().__init__(charm, relation_name)
         self._stored.set_default(external_host=None, scheme=None)
@@ -243,7 +243,7 @@ class TraefikRouteRequirer(Object):
             "The ``traefik_route v0`` library is DEPRECATED "
             "and no longer maintained under ``traefik-route-k8s-operator``. "
             "``traefik_route v0`` is now maintained under ``traefik-k8s-operator``. "
-            "Please import with ``charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route``."
+            "Please fetch the new library with ``charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route``."
         )
         super(TraefikRouteRequirer, self).__init__(charm, relation_name)
         self._stored.set_default(external_host=None, scheme=None)
