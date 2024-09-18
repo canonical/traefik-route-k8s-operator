@@ -348,7 +348,7 @@ class TraefikRouteK8SCharm(CharmBase):
         # merge configs?
         config = self._merge_traefik_configs(unit_configs)
         if self.traefik_route.is_ready():
-            self.traefik_route.submit_to_traefik(config=config)
+            self.traefik_route.submit_to_traefik(config=config)  # type: ignore
 
     @staticmethod
     def _generate_traefik_unit_config(route_config: RouteConfig) -> "UnitConfig":
