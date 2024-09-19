@@ -7,11 +7,11 @@ name: traefik-route-k8s
 display-name: |
   DEPRECATED traefik-route-k8s
 description: |
-  Configuration charm for traefik-k8s. Flexible ingress-per-unit provider.
-summary: |
   THIS CHARM IS DEPRECATED.
 
   The `traefik_route v0` library is DEPRECATED and is now maintained under https://github.com/canonical/traefik-k8s-operator.
+  Configuration charm for traefik-k8s. Flexible ingress-per-unit provider.
+summary: |
   Configuration charm for traefik-k8s. Flexible ingress-per-unit provider.
 
 provides:
