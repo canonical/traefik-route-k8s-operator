@@ -6,6 +6,13 @@
 
 ## Description
 
+> [!NOTE]  
+> THIS CHARM IS DEPRECATED.
+>
+> The `traefik_route v0` library is DEPRECATED and is now maintained under https://github.com/canonical/traefik-k8s-operator.
+>
+> Please fetch the new library with `charmcraft fetch-lib charms.traefik_k8s.v0.traefik_route`.
+
 Traefik-route-k8s provides separation of concerns between the general needs of 
 the ingress and ingress-per-unit relation interfaces, and the need to specify 
 per-relation routing logic at runtime which in this case is specific to Traefik.

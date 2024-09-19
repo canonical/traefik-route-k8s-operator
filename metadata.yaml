@@ -5,8 +5,11 @@
 # https://juju.is/docs/sdk/metadata-reference
 name: traefik-route-k8s
 display-name: |
-  traefik-route-k8s
+  DEPRECATED traefik-route-k8s
 description: |
+  THIS CHARM IS DEPRECATED.
+
+  The `traefik_route v0` library is DEPRECATED and is now maintained under https://github.com/canonical/traefik-k8s-operator.
   Configuration charm for traefik-k8s. Flexible ingress-per-unit provider.
 summary: |
   Configuration charm for traefik-k8s. Flexible ingress-per-unit provider.
